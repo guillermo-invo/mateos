@@ -1,0 +1,94 @@
+version: '3.9'
+
+services:
+  # ============================================
+  # PostgreSQL Database
+  # ============================================
+  postgres-db:
+    image: postgres:15.5-alpine
+    container_name: transcripcion-postgres
+    restart: unless-stopped
+    ports:
+      - "8832:5432"
+    environment:
+      POSTGRES_USER: ${DB_USER:-asistente}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-n8npass}
+      POSTGRES_DB: ${DB_NAME:-transcripciones_db}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-asistente} -d ${DB_NAME:-transcripciones_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # ============================================
+  # Next.js API Application
+  # ============================================
+  next-app:
+    build:
+      context: ./next-app
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+    container_name: transcripcion-api
+    restart: unless-stopped
+    ports:
+      - "8800:3000"
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DB_USER:-asistente}:${DB_PASSWORD:-n8npass}@postgres-db:5432/${DB_NAME:-transcripciones_db}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY: ${R2_ACCESS_KEY}
+      R2_SECRET_KEY: ${R2_SECRET_KEY}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - app-network
+    volumes:
+      - ./next-app/logs:/app/logs
+
+  # ============================================
+  # Telegram Bot Service
+  # ============================================
+  telegram-bot:
+    build:
+      context: ./telegram-bot
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+    container_name: transcripcion-bot
+    restart: unless-stopped
+    depends_on:
+      next-app:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      API_ENDPOINT: http://next-app:3000/api/process-audio
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    networks:
+      - app-network
+    volumes:
+      - ./telegram-bot/logs:/app/logs
+
+volumes:
+  postgres-data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

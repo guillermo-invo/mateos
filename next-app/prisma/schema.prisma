@@ -1,0 +1,49 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Transcripcion {
+  id        Int      @id @default(autoincrement())
+  hora      DateTime @default(now()) @db.Timestamptz(6)
+  texto     String   @db.Text
+
+  // Audio storage
+  r2_url    String?  @db.VarChar(512)
+  r2_key    String?  @db.VarChar(256)
+
+  // Metadata de Telegram
+  telegram_file_id   String?  @db.VarChar(256)
+  telegram_user_id   BigInt?
+  telegram_message_id BigInt?
+
+  // Metadata del audio
+  duracion_segundos  Int?
+  tamano_bytes       BigInt?
+
+  // Auditoría
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @updatedAt @db.Timestamptz(6)
+
+  // Estado de procesamiento
+  estado    EstadoProcesamiento @default(PROCESANDO)
+  error_msg String?  @db.Text
+
+  @@index([telegram_user_id])
+  @@index([created_at])
+  @@index([estado])
+  @@map("transcripciones")
+}
+
+enum EstadoProcesamiento {
+  PROCESANDO
+  COMPLETADO
+  ERROR
+}
