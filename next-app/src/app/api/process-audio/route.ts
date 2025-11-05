@@ -43,18 +43,50 @@ export async function POST(request: NextRequest): Promise<NextResponse<ProcessAu
     const arrayBuffer = await audioFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // 4. Crear registro inicial en DB
-    const transcription = await prisma.transcripcion.create({
-      data: {
-        texto: '', // Se actualizará después
-        estado: 'PROCESANDO',
-        telegram_file_id: metadata.telegramFileId,
-        telegram_user_id: BigInt(metadata.userId),
-        telegram_message_id: BigInt(metadata.messageId),
-        duracion_segundos: metadata.duration,
-        tamano_bytes: BigInt(audioFile.size),
-      },
+    // 4. Crear registro inicial en DB o encontrar existente
+    let transcription = await prisma.transcripcion.findFirst({
+      where: { telegram_file_id: metadata.telegramFileId },
     });
+
+    if (transcription && transcription.estado === 'COMPLETADO') {
+      logger.info('Audio already processed, returning existing transcription', {
+        transcriptionId: transcription.id,
+        telegramFileId: metadata.telegramFileId,
+      });
+      return NextResponse.json({
+        success: true,
+        transcriptionId: transcription.id,
+        texto: transcription.texto,
+      });
+    }
+
+    if (transcription) {
+      // Si existe pero no está completado (PROCESANDO o ERROR), lo actualizamos
+      transcription = await prisma.transcripcion.update({
+        where: { id: transcription.id },
+        data: {
+          estado: 'PROCESANDO',
+          telegram_user_id: BigInt(metadata.userId),
+          telegram_message_id: BigInt(metadata.messageId),
+          duracion_segundos: metadata.duration,
+          tamano_bytes: BigInt(audioFile.size),
+          error_msg: null, // Limpiar errores previos
+        },
+      });
+    } else {
+      // Si no existe, creamos uno nuevo
+      transcription = await prisma.transcripcion.create({
+        data: {
+          texto: '', // Se actualizará después
+          estado: 'PROCESANDO',
+          telegram_file_id: metadata.telegramFileId,
+          telegram_user_id: BigInt(metadata.userId),
+          telegram_message_id: BigInt(metadata.messageId),
+          duracion_segundos: metadata.duration,
+          tamano_bytes: BigInt(audioFile.size),
+        },
+      });
+    }
 
     transcriptionId = transcription.id;
 

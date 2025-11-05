@@ -9,7 +9,7 @@ services:
     container_name: transcripcion-postgres
     restart: unless-stopped
     ports:
-      - "8832:5432"
+      - "1432:5432"
     environment:
       POSTGRES_USER: ${DB_USER:-asistente}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-n8npass}
@@ -24,6 +24,7 @@ services:
       retries: 5
     networks:
       - app-network
+      - involucra-network
 
   # ============================================
   # Next.js API Application
@@ -36,8 +37,6 @@ services:
         NODE_ENV: production
     container_name: transcripcion-api
     restart: unless-stopped
-    ports:
-      - "8800:3000"
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -50,6 +49,7 @@ services:
       R2_SECRET_KEY: ${R2_SECRET_KEY}
       R2_BUCKET_NAME: ${R2_BUCKET_NAME}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
@@ -58,32 +58,11 @@ services:
       start_period: 40s
     networks:
       - app-network
+      - involucra-network
     volumes:
       - ./next-app/logs:/app/logs
-
-  # ============================================
-  # Telegram Bot Service
-  # ============================================
-  telegram-bot:
-    build:
-      context: ./telegram-bot
-      dockerfile: Dockerfile
-      args:
-        NODE_ENV: production
-    container_name: transcripcion-bot
-    restart: unless-stopped
-    depends_on:
-      next-app:
-        condition: service_healthy
-    environment:
-      NODE_ENV: production
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      API_ENDPOINT: http://next-app:3000/api/process-audio
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-    networks:
-      - app-network
-    volumes:
-      - ./telegram-bot/logs:/app/logs
+    ports:
+      - "1400:3000"
 
 volumes:
   postgres-data:
@@ -92,3 +71,5 @@ volumes:
 networks:
   app-network:
     driver: bridge
+  involucra-network:
+    external: true
