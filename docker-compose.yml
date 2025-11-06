@@ -17,6 +17,7 @@ services:
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-asistente} -d ${DB_NAME:-transcripciones_db}"]
       interval: 10s
@@ -50,6 +51,7 @@ services:
       R2_BUCKET_NAME: ${R2_BUCKET_NAME}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      WEBHOOK_AUTOMATIZACIONES_URL: http://automatizaciones:3100/webhook
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
@@ -63,6 +65,41 @@ services:
       - ./next-app/logs:/app/logs
     ports:
       - "1400:3000"
+
+  # ============================================
+  # Automatizaciones (Procesamiento IA)
+  # ============================================
+  automatizaciones:
+    build:
+      context: ./automatizaciones
+      dockerfile: Dockerfile
+    container_name: mateos-automatizaciones
+    restart: unless-stopped
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3100
+      DATABASE_URL: postgresql://${DB_USER:-asistente}:${DB_PASSWORD:-n8npass}@postgres-db:5432/asistente_db
+      MATEOS_DB_URL: postgresql://${DB_USER:-asistente}:${DB_PASSWORD:-n8npass}@postgres-db:5432/${DB_NAME:-transcripciones_db}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.6}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_TEMPERATURE: ${OPENAI_TEMPERATURE:-0.1}
+      OPENAI_MAX_TOKENS: ${OPENAI_MAX_TOKENS:-4000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3100/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - app-network
+      - involucra-network
+    ports:
+      - "1410:3100"
 
 volumes:
   postgres-data:

@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { uploadToR2 } from '@/lib/r2-client';
 import { transcribeAudioWithRetry } from '@/lib/whisper-client';
 import { logger } from '@/lib/logger';
+import { notifyAutomatizaciones } from '@/lib/automatizaciones-webhook';
 import { ProcessAudioResponse } from '@/types';
 
 // Validación con Zod
@@ -113,6 +114,19 @@ export async function POST(request: NextRequest): Promise<NextResponse<ProcessAu
     logger.info('Audio processed successfully', {
       transcriptionId,
       textLength: whisperResult.text.length,
+    });
+
+    // 7. ✨ NUEVO: Notificar a automatizaciones para procesamiento con IA
+    // No bloqueamos la respuesta, ejecutamos en background
+    notifyAutomatizaciones({
+      transcripcionId: updatedTranscription.id,
+      texto: updatedTranscription.texto,
+      archivoUrl: updatedTranscription.r2_url || undefined,
+      fecha: new Date().toISOString(),
+    }).catch(error => {
+      // Ya está logueado dentro de notifyAutomatizaciones
+      // Solo para evitar unhandled promise rejection
+      logger.debug('Webhook notification completed with error', { error });
     });
 
     return NextResponse.json({

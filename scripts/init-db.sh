@@ -1,18 +1,18 @@
 #!/bin/bash
 set -e
 
-echo "🔄 Esperando a que PostgreSQL esté listo..."
-until docker-compose exec -T postgres-db pg_isready -U ${DB_USER:-asistente}; do
-  echo "⏳ PostgreSQL no está listo aún... esperando 2 segundos"
-  sleep 2
-done
+# Script para crear la segunda base de datos "asistente_db"
+# Se ejecuta automáticamente al iniciar el contenedor de Postgres
 
-echo "✅ PostgreSQL está listo"
-echo "🔄 Ejecutando migraciones de Prisma..."
+echo "🔧 Creando base de datos asistente_db..."
 
-docker-compose exec next-app npx prisma migrate deploy
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
+    -- Crear base de datos si no existe
+    SELECT 'CREATE DATABASE asistente_db'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'asistente_db')\gexec
 
-echo "✅ Base de datos inicializada correctamente"
-echo ""
-echo "📊 Para ver los datos, ejecuta:"
-echo "   docker-compose exec next-app npx prisma studio"
+    -- Grant permisos
+    GRANT ALL PRIVILEGES ON DATABASE asistente_db TO $POSTGRES_USER;
+EOSQL
+
+echo "✅ Base de datos asistente_db creada exitosamente"

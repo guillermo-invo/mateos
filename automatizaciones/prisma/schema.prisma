@@ -1,0 +1,160 @@
+// Prisma Schema para Asistente Personal Extendido
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// NotaAudio - Copia enriquecida de transcripción
+// ============================================
+model NotaAudio {
+  id                    Int       @id @default(autoincrement())
+  transcripcionId       Int       @unique // FK a mateos.notas_de_voz.id
+  transcripcionCompleta String    @db.Text
+  archivoAudioUrl       String?
+  resumenEjecutivo      String?   @db.Text
+  fechaGrabacion        DateTime  @default(now())
+  procesado             Boolean   @default(false)
+  tipoDetectado         String?   // "tarea", "registro", "idea", "compromiso", "sin_clasificar"
+  confianzaDeteccion    Float?    // 0.0 - 1.0
+
+  // Relaciones
+  tareas                Tarea[]
+  compromisos           Compromiso[]
+  registros             Registro[]
+  ideas                 IdeaCapturada[]
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([transcripcionId])
+  @@index([procesado])
+  @@index([tipoDetectado])
+  @@index([fechaGrabacion])
+  @@map("notas_audio")
+}
+
+// ============================================
+// Tarea - Tareas TODO extraídas
+// ============================================
+model Tarea {
+  id                Int       @id @default(autoincrement())
+  titulo            String
+  descripcion       String?   @db.Text
+  fechaVencimiento  DateTime?
+  prioridad         Prioridad @default(MEDIA)
+  completada        Boolean   @default(false)
+  fechaCompletada   DateTime?
+
+  // Relaciones
+  notaAudioId       Int
+  notaAudio         NotaAudio @relation(fields: [notaAudioId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([notaAudioId])
+  @@index([completada])
+  @@index([fechaVencimiento])
+  @@index([prioridad])
+  @@map("tareas")
+}
+
+// ============================================
+// Compromiso - Compromisos con personas
+// ============================================
+model Compromiso {
+  id                Int       @id @default(autoincrement())
+  titulo            String
+  descripcion       String?   @db.Text
+  personaNombre     String
+  fechaLimite       DateTime?
+  yoMeComprometi    Boolean   @default(false) // true si YO prometí, false si otra persona
+  cumplido          Boolean   @default(false)
+  fechaCumplido     DateTime?
+
+  // Relaciones
+  notaAudioId       Int
+  notaAudio         NotaAudio @relation(fields: [notaAudioId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([notaAudioId])
+  @@index([cumplido])
+  @@index([fechaLimite])
+  @@index([personaNombre])
+  @@map("compromisos")
+}
+
+// ============================================
+// Registro - Actividades YA REALIZADAS (pasado)
+// ============================================
+model Registro {
+  id                    Int       @id @default(autoincrement())
+  descripcion           String    @db.Text
+  duracionHoras         Float?
+  proyecto              String?
+  personasInvolucradas  String[]  // Array de nombres
+  categoria             Categoria @default(TRABAJO)
+  fechaActividad        DateTime  @default(now())
+
+  // Relaciones
+  notaAudioId           Int
+  notaAudio             NotaAudio @relation(fields: [notaAudioId], references: [id], onDelete: Cascade)
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([notaAudioId])
+  @@index([fechaActividad])
+  @@index([categoria])
+  @@index([proyecto])
+  @@map("registros")
+}
+
+// ============================================
+// Idea - Ideas capturadas
+// ============================================
+model IdeaCapturada {
+  id                  Int       @id @default(autoincrement())
+  titulo              String
+  descripcion         String?   @db.Text
+  categoria           String?
+  implementada        Boolean   @default(false)
+  fechaImplementacion DateTime?
+
+  // Relaciones
+  notaAudioId         Int
+  notaAudio           NotaAudio @relation(fields: [notaAudioId], references: [id], onDelete: Cascade)
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([notaAudioId])
+  @@index([implementada])
+  @@index([categoria])
+  @@map("ideas")
+}
+
+// ============================================
+// Enums
+// ============================================
+
+enum Prioridad {
+  BAJA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+enum Categoria {
+  TRABAJO
+  PERSONAL
+  SOCIAL
+  OTRO
+}
