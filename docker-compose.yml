@@ -107,6 +107,29 @@ services:
     ports:
       - "1410:3100"
 
+  # ============================================
+  # Telegram Bot
+  # ============================================
+  telegram-bot:
+    build:
+      context: ./telegram-bot
+      dockerfile: Dockerfile
+    container_name: mateos-telegram-bot
+    restart: unless-stopped
+    depends_on:
+      next-app:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      API_ENDPOINT: http://next-app:3000/api/process-audio
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    networks:
+      - app-network
+      - involucra-network
+    volumes:
+      - ./telegram-bot/logs:/app/logs
+
 volumes:
   postgres-data:
     driver: local
