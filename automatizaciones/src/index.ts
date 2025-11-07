@@ -4,6 +4,7 @@ import cors from 'cors';
 import { z } from 'zod';
 import { processTranscription } from './processor';
 import { disconnectDB } from './db-writer';
+import { initScheduler, runDailySummaryNow } from './scheduler';
 import { WebhookPayload } from './types';
 
 // ============================================
@@ -108,6 +109,35 @@ app.get('/test/keywords/:word', async (req: Request, res: Response) => {
   });
 });
 
+/**
+ * Test endpoint - Para ejecutar resumen diario manualmente
+ */
+app.post('/test/daily-summary', async (req: Request, res: Response) => {
+  try {
+    console.log('🧪 Ejecutando resumen diario manual...');
+
+    // Responder rápido
+    res.status(202).json({
+      success: true,
+      message: 'Resumen diario ejecutándose...',
+    });
+
+    // Ejecutar en background
+    await runDailySummaryNow();
+
+    console.log('✅ Resumen diario manual completado');
+  } catch (error) {
+    console.error('❌ Error ejecutando resumen manual:', error);
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  }
+});
+
 // ============================================
 // Manejo de Errores
 // ============================================
@@ -129,8 +159,12 @@ const server = app.listen(PORT, () => {
   console.log(`✅ Servidor iniciado en puerto ${PORT}`);
   console.log(`🏥 Health check: http://localhost:${PORT}/health`);
   console.log(`📨 Webhook: http://localhost:${PORT}/webhook`);
-  console.log(`🧪 Test: http://localhost:${PORT}/test/keywords/:word`);
+  console.log(`🧪 Test keywords: http://localhost:${PORT}/test/keywords/:word`);
+  console.log(`🧪 Test resumen: POST http://localhost:${PORT}/test/daily-summary`);
   console.log('=====================================\n');
+
+  // Inicializar scheduler (resúmenes diarios automáticos)
+  initScheduler();
 });
 
 // ============================================
