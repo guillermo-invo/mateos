@@ -16,7 +16,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const MODEL = process.env.OPENAI_MODEL || 'gpt-5-nano';
 const TEMPERATURE = parseFloat(process.env.OPENAI_TEMPERATURE || '0.1');
 const MAX_TOKENS = parseInt(process.env.OPENAI_MAX_TOKENS || '4000', 10);
 
