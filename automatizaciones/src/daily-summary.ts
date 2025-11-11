@@ -45,60 +45,63 @@ interface DailySummaryData {
 // ============================================
 
 /**
- * Obtiene todos los datos del día actual
+ * Obtiene todos los datos desde las 20:04 del día anterior hasta las 20:00 de hoy
  */
 export async function getDailyData(): Promise<DailySummaryData> {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Inicio del día
+  // Fecha de inicio: Ayer a las 20:04
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - 1); // Día anterior
+  startDate.setHours(20, 4, 0, 0); // 20:04:00
 
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1); // Fin del día
+  // Fecha de fin: Hoy a las 20:00
+  const endDate = new Date();
+  endDate.setHours(20, 0, 0, 0); // 20:00:00
 
-  console.log(`📊 Consultando datos del ${today.toLocaleDateString()}...`);
+  console.log(`📊 Consultando datos desde ${startDate.toLocaleString('es-UY')} hasta ${endDate.toLocaleString('es-UY')}...`);
 
   // Consultar en paralelo
   const [registros, tareas, compromisos, ideas] = await Promise.all([
-    // Registros de HOY (actividades que hice)
+    // Registros desde las 20:04 del día anterior hasta las 20:00 de hoy
     prisma.registro.findMany({
       where: {
         createdAt: {
-          gte: today,
-          lt: tomorrow,
+          gte: startDate,
+          lt: endDate,
         },
       },
       orderBy: { createdAt: 'asc' },
     }),
 
-    // Tareas creadas HOY (que debo hacer)
+    // Tareas creadas en el período (que debo hacer)
     prisma.tarea.findMany({
       where: {
         createdAt: {
-          gte: today,
-          lt: tomorrow,
+          gte: startDate,
+          lt: endDate,
         },
         completada: false, // Solo las pendientes
       },
       orderBy: { prioridad: 'desc' },
     }),
 
-    // Compromisos creados HOY
+    // Compromisos creados en el período
     prisma.compromiso.findMany({
       where: {
         createdAt: {
-          gte: today,
-          lt: tomorrow,
+          gte: startDate,
+          lt: endDate,
         },
         cumplido: false, // Solo los pendientes
       },
       orderBy: { fechaLimite: 'asc' },
     }),
 
-    // Ideas de HOY
+    // Ideas del período
     prisma.ideaCapturada.findMany({
       where: {
         createdAt: {
-          gte: today,
-          lt: tomorrow,
+          gte: startDate,
+          lt: endDate,
         },
       },
       orderBy: { createdAt: 'asc' },
