@@ -9,7 +9,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // Tipos
 // ============================================
 
-interface DailySummaryData {
+export interface DailySummaryData {
   registros: Array<{
     id: number;
     descripcion: string;
@@ -249,7 +249,7 @@ Si no hay datos en alguna categoría, mencionarlo brevemente sin ser negativo.
 
   try {
     const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_DAILY_MODEL || 'gpt-5-mini',
+      model: process.env.OPENAI_DAILY_MODEL || 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
@@ -260,8 +260,8 @@ Si no hay datos en alguna categoría, mencionarlo brevemente sin ser negativo.
           content: prompt,
         },
       ],
-      temperature: 0.7,
-      max_tokens: 1500,
+      temperature: 1,
+      max_completion_tokens: 1500,
     });
 
     const summary = response.choices[0]?.message?.content || '';

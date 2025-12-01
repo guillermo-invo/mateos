@@ -16,8 +16,8 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const MODEL = process.env.OPENAI_MODEL || 'gpt-5-nano';
-const TEMPERATURE = parseFloat(process.env.OPENAI_TEMPERATURE || '0.1');
+const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const TEMPERATURE = parseFloat(process.env.OPENAI_TEMPERATURE || '0');
 const MAX_TOKENS = parseInt(process.env.OPENAI_MAX_TOKENS || '4000', 10);
 
 // ============================================
@@ -126,7 +126,7 @@ export async function extractEntities(
         },
       ],
       temperature: TEMPERATURE,
-      max_tokens: MAX_TOKENS,
+      max_completion_tokens: MAX_TOKENS,
       response_format: { type: 'json_object' },
     });
 

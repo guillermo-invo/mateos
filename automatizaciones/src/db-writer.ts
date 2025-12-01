@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 // ============================================
 
 /**
- * Crea NotaAudio en la BD extendida
+ * Crea o actualiza NotaAudio en la BD extendida
  */
 export async function createNotaAudio(
   transcripcionId: number,
@@ -16,11 +16,19 @@ export async function createNotaAudio(
   archivoUrl: string | undefined,
   detection: DetectionResult
 ) {
-  console.log(`💾 Creando NotaAudio para transcripcionId: ${transcripcionId}`);
+  console.log(`💾 Creando/Actualizando NotaAudio para transcripcionId: ${transcripcionId}`);
 
-  const notaAudio = await prisma.notaAudio.create({
-    data: {
+  const notaAudio = await prisma.notaAudio.upsert({
+    where: { transcripcionId },
+    create: {
       transcripcionId,
+      transcripcionCompleta: transcripcion,
+      archivoAudioUrl: archivoUrl,
+      tipoDetectado: detection.tipo,
+      confianzaDeteccion: detection.confianza,
+      procesado: false,
+    },
+    update: {
       transcripcionCompleta: transcripcion,
       archivoAudioUrl: archivoUrl,
       tipoDetectado: detection.tipo,
@@ -29,12 +37,13 @@ export async function createNotaAudio(
     },
   });
 
-  console.log(`✅ NotaAudio creada con ID: ${notaAudio.id}`);
+  console.log(`✅ NotaAudio creada/actualizada con ID: ${notaAudio.id}`);
   return notaAudio;
 }
 
 /**
  * Guarda la extracción de IA en las tablas correspondientes
+ * Si se reprocesa, borra las entidades antiguas primero
  */
 export async function saveExtraction(notaAudioId: number, extraccion: ExtraccionIA) {
   const entidadesCreadas = {
@@ -45,6 +54,12 @@ export async function saveExtraction(notaAudioId: number, extraccion: Extraccion
   };
 
   try {
+    // Borrar entidades antiguas relacionadas a esta notaAudio (para reprocesamiento)
+    await prisma.tarea.deleteMany({ where: { notaAudioId } });
+    await prisma.registro.deleteMany({ where: { notaAudioId } });
+    await prisma.compromiso.deleteMany({ where: { notaAudioId } });
+    await prisma.ideaCapturada.deleteMany({ where: { notaAudioId } });
+
     switch (extraccion.tipo) {
       case 'tarea':
         if (extraccion.tarea) {

@@ -6,6 +6,7 @@ import { processTranscription } from './processor';
 import { disconnectDB } from './db-writer';
 import { initScheduler, runDailySummaryNow } from './scheduler';
 import { WebhookPayload } from './types';
+import { sendHistoricalSummary } from './historical-summary';
 
 // ============================================
 // Configuración
@@ -137,6 +138,142 @@ app.post('/test/daily-summary', async (req: Request, res: Response) => {
     }
   }
 });
+
+/**
+ * Test endpoint - Para ejecutar resumen histórico de una fecha específica
+ */
+app.post('/test/historical-summary/:year/:month/:day', async (req: Request, res: Response) => {
+  try {
+    const { year, month, day } = req.params;
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day)); // month-1 porque los meses en JS son 0-11
+
+    console.log(`🧪 Ejecutando resumen histórico del ${date.toLocaleDateString('es-UY')}...`);
+
+    // Responder rápido
+    res.status(202).json({
+      success: true,
+      message: `Resumen histórico del ${date.toLocaleDateString('es-UY')} ejecutándose...`,
+    });
+
+    // Ejecutar en background
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+    if (!chatId) {
+      throw new Error('TELEGRAM_CHAT_ID no configurado');
+    }
+
+    await sendHistoricalSummary(chatId, date, true);
+
+    console.log('✅ Resumen histórico completado');
+  } catch (error) {
+    console.error('❌ Error ejecutando resumen histórico:', error);
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  }
+});
+
+/**
+ * Test endpoint - Para reprocesar notas no procesadas en un rango de fechas
+ * POST /test/reprocess-notes/:startDate/:endDate
+ * Ej: /test/reprocess-notes/2025-11-08/2025-11-16
+ */
+app.post('/test/reprocess-notes/:startDate/:endDate', async (req: Request, res: Response) => {
+  try {
+    const { startDate, endDate } = req.params;
+
+    console.log(`\n🔄 ===== REPROCESANDO NOTAS =====`);
+    console.log(`📅 Rango: ${startDate} a ${endDate}`);
+
+    // Responder rápido
+    res.status(202).json({
+      success: true,
+      message: `Reprocesamiento de notas iniciado (${startDate} a ${endDate})`,
+    });
+
+    // Procesar en background
+    await reprocessNotesInDateRange(startDate, endDate);
+
+    console.log('✅ Reprocesamiento completado');
+  } catch (error) {
+    console.error('❌ Error reprocesando notas:', error);
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  }
+});
+
+// ============================================
+// Función de Reprocesamiento
+// ============================================
+
+async function reprocessNotesInDateRange(startDateStr: string, endDateStr: string): Promise<void> {
+  const { PrismaClient } = await import('@prisma/client');
+  const prisma = new PrismaClient();
+
+  try {
+    const startDate = new Date(startDateStr);
+    const endDate = new Date(endDateStr);
+    endDate.setDate(endDate.getDate() + 1); // Incluir el último día completo
+
+    console.log(`\n📊 Buscando notas sin procesar entre ${startDate.toISOString()} y ${endDate.toISOString()}...`);
+
+    const notasAudio = await prisma.notaAudio.findMany({
+      where: {
+        procesado: false,
+        createdAt: {
+          gte: startDate,
+          lt: endDate,
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    console.log(`📋 Encontradas ${notasAudio.length} notas sin procesar`);
+
+    if (notasAudio.length === 0) {
+      console.log('✅ No hay notas para procesar');
+      return;
+    }
+
+    // Procesar cada nota
+    for (let i = 0; i < notasAudio.length; i++) {
+      const nota = notasAudio[i];
+      console.log(`\n[${i + 1}/${notasAudio.length}] Procesando NotaAudio ID: ${nota.id}`);
+
+      try {
+        const result = await processTranscription({
+          transcripcionId: nota.transcripcionId,
+          texto: nota.transcripcionCompleta,
+          archivoUrl: nota.archivoAudioUrl || undefined,
+          fecha: nota.createdAt.toISOString(),
+        }, true); // forceReprocess = true
+
+        if (result.success) {
+          console.log(`✅ Nota ${nota.id} procesada: ${result.tipo}`);
+        } else {
+          console.log(`⚠️ Nota ${nota.id} falló: ${result.error}`);
+        }
+      } catch (error) {
+        console.error(`❌ Error procesando nota ${nota.id}:`, error);
+      }
+
+      // Pequeña pausa entre procesamientos para no sobrecargar OpenAI
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    console.log(`\n✅ Reprocesamiento finalizado: ${notasAudio.length} notas procesadas`);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
 
 // ============================================
 // Manejo de Errores

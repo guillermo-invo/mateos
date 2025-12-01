@@ -13,21 +13,26 @@ import { createNotaAudio, saveExtraction, isTranscripcionProcessed } from './db-
  * 2. Extrae entidades con OpenAI
  * 3. Guarda en BD extendida
  */
-export async function processTranscription(payload: WebhookPayload): Promise<ProcessorResult> {
+export async function processTranscription(payload: WebhookPayload, forceReprocess: boolean = false): Promise<ProcessorResult> {
   console.log('\n🔧 ===== INICIANDO PROCESAMIENTO =====');
   console.log(`📋 Transcripción ID: ${payload.transcripcionId}`);
   console.log(`📝 Texto: "${payload.texto.substring(0, 100)}..."`);
+  if (forceReprocess) {
+    console.log('🔄 Modo reprocesamiento forzado');
+  }
 
   try {
-    // Verificar si ya fue procesado
-    const yaProcessed = await isTranscripcionProcessed(payload.transcripcionId);
-    if (yaProcessed) {
-      console.log('⚠️ Esta transcripción ya fue procesada, ignorando...');
-      return {
-        success: false,
-        tipo: 'sin_clasificar',
-        error: 'Ya procesado anteriormente',
-      };
+    // Verificar si ya fue procesado (saltar si forceReprocess=true)
+    if (!forceReprocess) {
+      const yaProcessed = await isTranscripcionProcessed(payload.transcripcionId);
+      if (yaProcessed) {
+        console.log('⚠️ Esta transcripción ya fue procesada, ignorando...');
+        return {
+          success: false,
+          tipo: 'sin_clasificar',
+          error: 'Ya procesado anteriormente',
+        };
+      }
     }
 
     // Paso 1: Detectar tipo con keyword matching
