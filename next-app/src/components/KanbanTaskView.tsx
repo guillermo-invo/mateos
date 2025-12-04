@@ -109,12 +109,12 @@ const KanbanTaskView: React.FC<Props> = ({ data }) => {
       <KanbanHeaderRow />
 
       {/* Nivel 1: Áreas de Vida */}
-      <Accordion variant="splitted" className="px-0">
+      <Accordion variant="splitted" className="px-0" defaultExpandedKeys="all" selectionMode="multiple">
         {data.map((area) => (
           <AccordionItem key={area.id} title={<span className="font-bold text-lg text-gray-900 dark:text-white">{area.title}</span>} className="bg-gray-50">
 
             {/* Nivel 2: Proyectos */}
-            <Accordion variant="light" className="pl-2">
+            <Accordion variant="light" className="pl-2" defaultExpandedKeys="all" selectionMode="multiple">
               {area.projects.map((project) => (
                 <AccordionItem
                   key={project.id}
@@ -135,7 +135,7 @@ const KanbanTaskView: React.FC<Props> = ({ data }) => {
                 >
 
                   {/* Nivel 3: Tareas */}
-                  <Accordion variant="light">
+                  <Accordion variant="light" defaultExpandedKeys="all" selectionMode="multiple">
                     {project.tasks.map((task) => (
                       <AccordionItem key={task.id} title={<span className="text-gray-600 dark:text-gray-300">{task.title}</span>}>
 
