@@ -7,6 +7,7 @@ import {
   RegistroExtraido,
   IdeaExtraida,
 } from './types';
+import { getModelConfig } from './model-config';
 
 // ============================================
 // Configuración de OpenAI
@@ -15,10 +16,6 @@ import {
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const TEMPERATURE = parseFloat(process.env.OPENAI_TEMPERATURE || '0');
-const MAX_TOKENS = parseInt(process.env.OPENAI_MAX_TOKENS || '4000', 10);
 
 // ============================================
 // Prompts Específicos por Tipo
@@ -89,6 +86,21 @@ Extrae los siguientes campos en formato JSON:
 
 Responde SOLO con el JSON, sin texto adicional.
 `.trim(),
+
+  proyecto: (texto: string) => `
+Extrae de esta nota una IDEA DE PROYECTO.
+
+Transcripción: "${texto}"
+
+Extrae los siguientes campos en formato JSON:
+{
+  "titulo": "string (nombre del proyecto, breve)",
+  "descripcion": "string (descripción completa del proyecto)",
+  "categoria": "string (tipo: 'profesional', 'personal', 'social', 'otro')"
+}
+
+Responde SOLO con el JSON, sin texto adicional.
+`.trim(),
 };
 
 // ============================================
@@ -110,10 +122,13 @@ export async function extractEntities(
   try {
     console.log(`🧠 Extrayendo ${tipo} con OpenAI...`);
 
+    // Obtener configuración de modelo
+    const modelConfig = getModelConfig('extraction');
+
     const prompt = PROMPTS[tipo](texto);
 
     const response = await openai.chat.completions.create({
-      model: MODEL,
+      model: modelConfig.model,
       messages: [
         {
           role: 'system',
@@ -125,8 +140,8 @@ export async function extractEntities(
           content: prompt,
         },
       ],
-      temperature: TEMPERATURE,
-      max_completion_tokens: MAX_TOKENS,
+      temperature: modelConfig.temperature ?? 0,
+      max_completion_tokens: modelConfig.maxTokens ?? 4000,
       response_format: { type: 'json_object' },
     });
 

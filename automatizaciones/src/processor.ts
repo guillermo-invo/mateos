@@ -1,7 +1,10 @@
-import { WebhookPayload, ProcessorResult } from './types';
+import { WebhookPayload, ProcessorResult, TipoMensaje } from './types';
 import { detectTipoFromTranscription } from './keyword-matcher';
 import { extractEntities, validateExtraction } from './ai-extractor';
 import { createNotaAudio, saveExtraction, isTranscripcionProcessed } from './db-writer';
+import { PrismaClient } from '@prisma/client'; // Added PrismaClient import
+
+const prisma = new PrismaClient(); // Initialize Prisma client
 
 // ============================================
 // Procesador Principal
@@ -51,7 +54,7 @@ export async function processTranscription(payload: WebhookPayload, forceReproce
       detection
     );
 
-    // Si no se clasificó, guardar y terminar
+    // Handle different types of messages
     if (detection.tipo === 'sin_clasificar') {
       console.log('⚠️ No se detectó keyword, guardando como sin_clasificar');
       return {
@@ -59,47 +62,57 @@ export async function processTranscription(payload: WebhookPayload, forceReproce
         notaAudioId: notaAudio.id,
         tipo: 'sin_clasificar',
       };
+    } else if (detection.tipo === 'proyecto') {
+        console.log('💡 Detectada idea de proyecto, creando IdeaCapturada...');
+        const ideaId = await crearIdeaProyecto(detection.textoLimpio, notaAudio.id);
+        await enviarNotificacion("💡 Idea de proyecto capturada. ¡Puedes desarrollarla en MATEOS!");
+        return {
+          success: true,
+          notaAudioId: notaAudio.id,
+          tipo: 'proyecto',
+          entidadesCreadas: { ideas: 1 },
+        };
+    } else { // For 'tarea', 'registro', 'compromiso', 'idea' (classic extraction)
+        // Paso 3: Extraer entidades con IA
+        console.log(`\n🧠 Paso 3: Extrayendo ${detection.tipo} con OpenAI...`);
+        const extraccion = await extractEntities(detection.textoLimpio, detection.tipo);
+
+        if (!extraccion) {
+          console.log('❌ No se pudo extraer entidades');
+          return {
+            success: false,
+            notaAudioId: notaAudio.id,
+            tipo: detection.tipo,
+            error: 'Extracción falló',
+          };
+        }
+
+        // Validar extracción
+        const isValid = validateExtraction(extraccion);
+        if (!isValid) {
+          console.log('❌ Extracción inválida (faltan campos requeridos)');
+          return {
+            success: false,
+            notaAudioId: notaAudio.id,
+            tipo: detection.tipo,
+            error: 'Extracción inválida',
+          };
+        }
+
+        // Paso 4: Guardar en BD
+        console.log('\n💾 Paso 4: Guardando entidades en BD...');
+        const entidadesCreadas = await saveExtraction(notaAudio.id, extraccion);
+
+        console.log('\n✅ ===== PROCESAMIENTO COMPLETADO =====');
+        console.log(`📊 Entidades creadas:`, entidadesCreadas);
+
+        return {
+          success: true,
+          notaAudioId: notaAudio.id,
+          tipo: detection.tipo,
+          entidadesCreadas,
+        };
     }
-
-    // Paso 3: Extraer entidades con IA
-    console.log(`\n🧠 Paso 3: Extrayendo ${detection.tipo} con OpenAI...`);
-    const extraccion = await extractEntities(detection.textoLimpio, detection.tipo);
-
-    if (!extraccion) {
-      console.log('❌ No se pudo extraer entidades');
-      return {
-        success: false,
-        notaAudioId: notaAudio.id,
-        tipo: detection.tipo,
-        error: 'Extracción falló',
-      };
-    }
-
-    // Validar extracción
-    const isValid = validateExtraction(extraccion);
-    if (!isValid) {
-      console.log('❌ Extracción inválida (faltan campos requeridos)');
-      return {
-        success: false,
-        notaAudioId: notaAudio.id,
-        tipo: detection.tipo,
-        error: 'Extracción inválida',
-      };
-    }
-
-    // Paso 4: Guardar en BD
-    console.log('\n💾 Paso 4: Guardando entidades en BD...');
-    const entidadesCreadas = await saveExtraction(notaAudio.id, extraccion);
-
-    console.log('\n✅ ===== PROCESAMIENTO COMPLETADO =====');
-    console.log(`📊 Entidades creadas:`, entidadesCreadas);
-
-    return {
-      success: true,
-      notaAudioId: notaAudio.id,
-      tipo: detection.tipo,
-      entidadesCreadas,
-    };
   } catch (error) {
     console.error('\n❌ ===== ERROR EN PROCESAMIENTO =====');
     console.error(error);
@@ -110,4 +123,32 @@ export async function processTranscription(payload: WebhookPayload, forceReproce
       error: error instanceof Error ? error.message : 'Error desconocido',
     };
   }
+}
+
+async function crearIdeaProyecto(texto: string, notaAudioId: number): Promise<number> {
+  const titulo = extraerTituloProyecto(texto);
+  const idea = await prisma.ideaCapturada.create({
+    data: {
+      notaAudioId: notaAudioId,
+      titulo: titulo,
+      descripcion: texto,
+      categoria: 'proyecto_potencial',
+      // otros campos se dejan con sus valores por defecto
+    }
+  });
+  return idea.id;
+}
+
+function extraerTituloProyecto(texto: string): string {
+  // Simple heuristic: take the first sentence or first few words
+  const firstSentence = texto.split('. ')[0];
+  if (firstSentence.length > 50) {
+    return firstSentence.substring(0, 50) + '...';
+  }
+  return firstSentence;
+}
+
+async function enviarNotificacion(mensaje: string): Promise<void> {
+  console.log(`🔔 Notificación: ${mensaje}`);
+  // Placeholder: In a real app, this would integrate with a notification service (e.g., Telegram, email).
 }

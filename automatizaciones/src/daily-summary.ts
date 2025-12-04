@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import OpenAI from 'openai';
 import { sendLongMessage } from './telegram-client';
+import { getModelConfig } from './model-config';
 
 const prisma = new PrismaClient();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -248,8 +249,11 @@ Si no hay datos en alguna categoría, mencionarlo brevemente sin ser negativo.
 `;
 
   try {
+    // Obtener configuración de modelo
+    const modelConfig = getModelConfig('dailySummary');
+
     const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_DAILY_MODEL || 'gpt-4o-mini',
+      model: modelConfig.model,
       messages: [
         {
           role: 'system',
@@ -260,8 +264,8 @@ Si no hay datos en alguna categoría, mencionarlo brevemente sin ser negativo.
           content: prompt,
         },
       ],
-      temperature: 1,
-      max_completion_tokens: 1500,
+      temperature: modelConfig.temperature ?? 1,
+      max_completion_tokens: modelConfig.maxTokens ?? 1500,
     });
 
     const summary = response.choices[0]?.message?.content || '';

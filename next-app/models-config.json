@@ -1,0 +1,24 @@
+{
+  "transcription": {
+    "model": "whisper-1",
+    "description": "Modelo para transcripción de audio"
+  },
+  "extraction": {
+    "model": "gpt-5-mini",
+    "temperature": 0,
+    "maxTokens": 4000,
+    "description": "Modelo para clasificar y extraer entidades del bot (tareas, compromisos, registros, ideas)"
+  },
+  "projectCreation": {
+    "model": "gpt-5.1",
+    "temperature": 0.7,
+    "maxTokens": 8000,
+    "description": "Modelo para crear proyectos estratégicos y tareas estratégicas con análisis profundo"
+  },
+  "dailySummary": {
+    "model": "gpt-5-mini",
+    "temperature": 0.5,
+    "maxTokens": 4000,
+    "description": "Modelo para resúmenes diarios automáticos"
+  }
+}

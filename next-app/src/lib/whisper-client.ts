@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { logger } from './logger';
 import { WhisperTranscriptionResult } from '@/types';
+import { getModelConfig } from './model-config';
 
 // OpenAI client lazy initialization
 let openai: OpenAI | null = null;
@@ -51,9 +52,12 @@ export async function transcribeAudio(
 
     const client = getOpenAIClient();
 
+    // Obtener configuración de modelo
+    const modelConfig = getModelConfig('transcription');
+
     const transcription = await client.audio.transcriptions.create({
       file: file,
-      model: 'whisper-1',
+      model: modelConfig.model,
       language: 'es', // Español por defecto
       response_format: 'json',
     });

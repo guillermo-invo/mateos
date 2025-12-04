@@ -1,0 +1,28 @@
+{
+  "transcription": {
+    "model": "gpt-4o-mini-transcribe",
+    "mode": "Standard",
+    "description": "Transcripción costo-eficiente (~US$0.003/min), ideal para volumen alto."
+  },
+  "extraction": {
+    "model": "gpt-5 mini",
+    "mode": "flex",
+    "temperature": 0,
+    "maxTokens": 4000,
+    "description": "Modelo más barato para extracción o clasificación simple de texto."
+  },
+  "projectCreation": {
+    "model": "gpt-5.1",
+    "mode": "Standard",
+    "temperature": 0.7,
+    "maxTokens": 8000,
+    "description": "Modelo actual, poderoso para generación de ideas, contenidos complejos y proyectos."
+  },
+  "dailySummary": {
+    "model": "gpt-5 mini",
+    "mode": "flex",
+    "temperature": 0.5,
+    "maxTokens": 4000,
+    "description": "Equilibrio entre costo y calidad para resúmenes y tareas de texto rutinarias."
+  }
+}

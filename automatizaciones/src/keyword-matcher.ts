@@ -15,6 +15,7 @@ const KEYWORDS: KeywordConfig[] = [
   { word: 'juan', tipo: 'registro' },
   { word: 'ide', tipo: 'idea' },
   { word: 'compa', tipo: 'compromiso' },
+  { word: 'proy', tipo: 'proyecto' },
 ];
 
 // Umbral de similitud (60% = 0.6)

@@ -7,10 +7,13 @@ import { disconnectDB } from './db-writer';
 import { initScheduler, runDailySummaryNow } from './scheduler';
 import { WebhookPayload } from './types';
 import { sendHistoricalSummary } from './historical-summary';
+import { generarEstructuraProyecto } from './ia/generador-proyectos'; // New import
+import { guardarProyectoGenerado } from './ia/guardar-proyecto';     // New import
+import { processProjectWithAI, saveProjectAnalysis, ProyectoData } from './project-creator';
 
-// ============================================
+// ============================================ 
 // Configuración
-// ============================================
+// ============================================ 
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3100', 10);
@@ -18,9 +21,9 @@ const PORT = parseInt(process.env.PORT || '3100', 10);
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// ============================================
+// ============================================ 
 // Schema de Validación
-// ============================================
+// ============================================ 
 
 const WebhookPayloadSchema = z.object({
   transcripcionId: z.number().int().positive(),
@@ -29,9 +32,26 @@ const WebhookPayloadSchema = z.object({
   fecha: z.string().datetime(),
 });
 
-// ============================================
+const GenerarProyectoPayloadSchema = z.object({
+  descripcion: z.string().min(1),
+  documentosUrls: z.array(z.string().url()).optional(),
+  ideaId: z.number().int().positive().optional(),
+});
+
+const ProyectoWebhookPayloadSchema = z.object({
+  proyectoId: z.number().int().positive(),
+  nombre: z.string().min(1),
+  descripcion: z.string().nullable(),
+  areasIds: z.array(z.number().int()).default([]),
+  motivosIds: z.array(z.number().int()).default([]),
+  destrezasRequeridasIds: z.array(z.number().int()).default([]),
+  dificultadesIds: z.array(z.number().int()).default([]),
+  misionesIds: z.array(z.number().int()).default([]),
+});
+
+// ============================================ 
 // Rutas
-// ============================================
+// ============================================ 
 
 /**
  * Health check
@@ -48,7 +68,7 @@ app.get('/health', (_req: Request, res: Response) => {
  * Webhook principal - Recibe transcripciones de mateos
  */
 app.post('/webhook', async (req: Request, res: Response) => {
-  console.log('\n📨 Webhook recibido:', new Date().toISOString());
+  console.log('\n\x1b[38;5;208m\x1b[1m📨 Webhook recibido:\x1b[0m', new Date().toISOString());
 
   try {
     // Validar payload
@@ -96,6 +116,132 @@ app.post('/webhook', async (req: Request, res: Response) => {
 });
 
 /**
+ * Webhook para procesar proyectos estratégicos existentes con IA
+ * Recibe un proyecto ya creado y lo analiza para generar tareas estratégicas
+ */
+app.post('/webhook/proyecto', async (req: Request, res: Response) => {
+  console.log('\n\x1b[38;5;45m\x1b[1m🎯 Webhook Proyecto recibido:\x1b[0m', new Date().toISOString());
+
+  try {
+    // Validar payload
+    const validationResult = ProyectoWebhookPayloadSchema.safeParse(req.body);
+
+    if (!validationResult.success) {
+      console.error('❌ Payload inválido:', validationResult.error);
+      return res.status(400).json({
+        success: false,
+        error: 'Payload inválido',
+        details: validationResult.error.issues,
+      });
+    }
+
+    const payload = validationResult.data as ProyectoData & { proyectoId: number };
+
+    // Responder rápido
+    res.status(202).json({
+      success: true,
+      message: 'Procesamiento de proyecto iniciado',
+      proyectoId: payload.proyectoId,
+    });
+
+    // Procesar async con IA
+    console.log(`🤖 Procesando proyecto "${payload.nombre}" con IA...`);
+
+    const proyectoData: ProyectoData = {
+      id: payload.proyectoId,
+      nombre: payload.nombre,
+      descripcion: payload.descripcion,
+      areasIds: payload.areasIds,
+      motivosIds: payload.motivosIds,
+      destrezasRequeridasIds: payload.destrezasRequeridasIds,
+      dificultadesIds: payload.dificultadesIds,
+      misionesIds: payload.misionesIds,
+    };
+
+    const analisis = await processProjectWithAI(proyectoData);
+
+    await saveProjectAnalysis(payload.proyectoId, analisis);
+
+    console.log(`✅ Proyecto ${payload.proyectoId} procesado exitosamente`);
+  } catch (error) {
+    console.error('❌ Error en webhook proyecto:', error);
+
+    // Si aún no respondimos, responder con error
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: 'Error interno del servidor',
+      });
+    }
+  }
+});
+
+/**
+ * Endpoint para generar y guardar un proyecto estratégico con IA
+ */
+app.post('/generar-proyecto', async (req: Request, res: Response) => {
+  console.log('\n\x1b[38;5;208m\x1b[1m🧠 Generar Proyecto recibido:\x1b[0m', new Date().toISOString());
+
+  try {
+    const validationResult = GenerarProyectoPayloadSchema.safeParse(req.body);
+
+    if (!validationResult.success) {
+      console.error('❌ Payload inválido:', validationResult.error);
+      return res.status(400).json({
+        success: false,
+        error: 'Payload inválido',
+        details: validationResult.error.issues,
+      });
+    }
+
+    const { descripcion, documentosUrls, ideaId } = validationResult.data;
+
+    // 1. Generar estructura del proyecto con IA
+    const estructuraGenerada = await generarEstructuraProyecto(descripcion, documentosUrls);
+
+    // 2. Guardar el proyecto generado en la BD
+    // (Need to pass AI model details and token usage from generarEstructuraProyecto)
+    // For now, placeholders for modelIA, tokensUsados, prompt, respuesta
+    const projectId = await guardarProyectoGenerado(
+      estructuraGenerada,
+      "claude-3-5-sonnet-20241022", // Placeholder for modelIA
+      1000, // Placeholder for tokensUsados
+      descripcion, // Placeholder for prompt
+      JSON.stringify(estructuraGenerada) // Placeholder for respuesta
+    );
+
+    // If an ideaId was provided, update the IdeaCapturada
+    if (ideaId) {
+      const { PrismaClient } = await import('@prisma/client');
+      const prisma = new PrismaClient();
+      await prisma.ideaCapturada.update({
+        where: { id: ideaId },
+        data: {
+          implementada: true,
+          proyectoEstrategicoId: projectId,
+          fechaImplementacion: new Date(),
+        },
+      });
+      await prisma.$disconnect(); // Disconnect Prisma Client
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Proyecto generado y guardado exitosamente',
+      projectId: projectId,
+    });
+
+  } catch (error) {
+    console.error('❌ Error generando proyecto:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Error interno del servidor',
+    });
+  }
+});
+
+
+/**
  * Test endpoint - Para probar fuzzy matching
  */
 app.get('/test/keywords/:word', async (req: Request, res: Response) => {
@@ -120,7 +266,7 @@ app.post('/test/daily-summary', async (req: Request, res: Response) => {
     // Responder rápido
     res.status(202).json({
       success: true,
-      message: 'Resumen diario ejecutándose...',
+      message: 'Resumen diario ejecutándose...', 
     });
 
     // Ejecutar en background
@@ -185,7 +331,7 @@ app.post('/test/reprocess-notes/:startDate/:endDate', async (req: Request, res: 
   try {
     const { startDate, endDate } = req.params;
 
-    console.log(`\n🔄 ===== REPROCESANDO NOTAS =====`);
+    console.log('\n\x1b[38;5;166m\x1b[1m🔄 ===== REPROCESANDO NOTAS =====\x1b[0m');
     console.log(`📅 Rango: ${startDate} a ${endDate}`);
 
     // Responder rápido
@@ -210,9 +356,9 @@ app.post('/test/reprocess-notes/:startDate/:endDate', async (req: Request, res: 
   }
 });
 
-// ============================================
+// ============================================ 
 // Función de Reprocesamiento
-// ============================================
+// ============================================ 
 
 async function reprocessNotesInDateRange(startDateStr: string, endDateStr: string): Promise<void> {
   const { PrismaClient } = await import('@prisma/client');
@@ -275,9 +421,9 @@ async function reprocessNotesInDateRange(startDateStr: string, endDateStr: strin
   }
 }
 
-// ============================================
+// ============================================ 
 // Manejo de Errores
-// ============================================
+// ============================================ 
 
 app.use((err: Error, _req: Request, res: Response, _next: any) => {
   console.error('❌ Error no manejado:', err);
@@ -287,9 +433,9 @@ app.use((err: Error, _req: Request, res: Response, _next: any) => {
   });
 });
 
-// ============================================
+// ============================================ 
 // Inicio del Servidor
-// ============================================
+// ============================================ 
 
 const server = app.listen(PORT, () => {
   console.log('\n🚀 ===== MATEOS AUTOMATIZACIONES =====');
@@ -304,9 +450,9 @@ const server = app.listen(PORT, () => {
   initScheduler();
 });
 
-// ============================================
+// ============================================ 
 // Shutdown Graceful
-// ============================================
+// ============================================ 
 
 process.on('SIGTERM', async () => {
   console.log('\n⚠️ SIGTERM recibido, cerrando servidor...');

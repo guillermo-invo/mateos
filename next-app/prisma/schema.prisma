@@ -1,6 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
+// Prisma Schema para Asistente Personal Extendido
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,31 +8,418 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// NotaAudio - Copia enriquecida de transcripción
+// ============================================
+model NotaAudio {
+  id                    Int       @id @default(autoincrement())
+  transcripcionId       Int       @unique // FK a mateos.notas_de_voz.id
+  transcripcionCompleta String    @db.Text
+  archivoAudioUrl       String?
+  resumenEjecutivo      String?   @db.Text
+  fechaGrabacion        DateTime  @default(now())
+  procesado             Boolean   @default(false)
+  tipoDetectado         String?   // "tarea", "registro", "idea", "compromiso", "sin_clasificar"
+  confianzaDeteccion    Float?    // 0.0 - 1.0
+
+  // Relaciones
+  tareas                Tarea[]
+  compromisos           Compromiso[]
+  registros             Registro[]
+  ideas                 IdeaCapturada[]
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([transcripcionId])
+  @@index([procesado])
+  @@index([tipoDetectado])
+  @@index([fechaGrabacion])
+  @@map("notas_audio")
+}
+
+// ============================================
+// Tarea - Tareas TODO extraídas (V1)
+// ============================================
+model Tarea {
+  id                Int       @id @default(autoincrement())
+  titulo            String
+  descripcion       String?   @db.Text
+  fechaVencimiento  DateTime?
+  prioridad         Prioridad @default(MEDIA)
+  completada        Boolean   @default(false)
+  fechaCompletada   DateTime?
+
+  // Relaciones
+  notaAudioId       Int
+  notaAudio         NotaAudio @relation(fields: [notaAudioId], references: [id], onDelete: Cascade)
+
+  proyectoEstrategicoId Int?                 @map("proyecto_estrategico_id")
+  proyectoEstrategico   ProyectoEstrategico? @relation(fields: [proyectoEstrategicoId], references: [id])
+
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([notaAudioId])
+  @@index([completada])
+  @@index([fechaVencimiento])
+  @@index([prioridad])
+  @@map("tareas")
+}
+
+// ============================================
+// Compromiso - Compromisos con personas
+// ============================================
+model Compromiso {
+  id                Int       @id @default(autoincrement())
+  titulo            String
+  descripcion       String?   @db.Text
+  personaNombre     String
+  fechaLimite       DateTime?
+  yoMeComprometi    Boolean   @default(false) // true si YO prometí, false si otra persona
+  cumplido          Boolean   @default(false)
+  fechaCumplido     DateTime?
+
+  // Relaciones
+  notaAudioId       Int
+  notaAudio         NotaAudio @relation(fields: [notaAudioId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([notaAudioId])
+  @@index([cumplido])
+  @@index([fechaLimite])
+  @@index([personaNombre])
+  @@map("compromisos")
+}
+
+// ============================================
+// Registro - Actividades YA REALIZADAS (pasado)
+// ============================================
+model Registro {
+  id                    Int       @id @default(autoincrement())
+  descripcion           String    @db.Text
+  duracionHoras         Float?
+  proyecto              String?
+  personasInvolucradas  String[]
+  categoria             Categoria @default(TRABAJO)
+  fechaActividad        DateTime  @default(now())
+
+  // Relaciones
+  notaAudioId           Int
+  notaAudio             NotaAudio @relation(fields: [notaAudioId], references: [id], onDelete: Cascade)
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([notaAudioId])
+  @@index([fechaActividad])
+  @@index([categoria])
+  @@index([proyecto])
+  @@map("registros")
+}
+
+// ============================================
+// Idea - Ideas capturadas
+// ============================================
+model IdeaCapturada {
+  id                  Int       @id @default(autoincrement())
+  titulo              String
+  descripcion         String?   @db.Text
+  categoria           String?
+  implementada        Boolean   @default(false)
+  fechaImplementacion DateTime?
+
+  // Relaciones
+  notaAudioId         Int
+  notaAudio           NotaAudio @relation(fields: [notaAudioId], references: [id], onDelete: Cascade)
+
+  proyectoEstrategicoId Int?                 @map("proyecto_estrategico_id")
+  proyectoEstrategico   ProyectoEstrategico? @relation(fields: [proyectoEstrategicoId], references: [id])
+
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([notaAudioId])
+  @@index([implementada])
+  @@index([categoria])
+  @@map("ideas_capturadas")
+}
+
+
+// ============================================
+// Modelos Estratégicos (V2)
+// ============================================
+
+// --- Tablas Taxativas ---
+
+model AreasVida {
+  id                  Int       @id @default(autoincrement())
+  nombre              String    @unique @db.VarChar(100)
+  descripcion         String?   @db.Text
+  colorHex            String?   @map("color_hex") @db.VarChar(7)
+  ordenVisualizacion  Int?      @map("orden_visualizacion")
+  activa              Boolean?
+
+  @@map("areas_vida")
+}
+
+model MotivosPersonales {
+  id            Int       @id @default(autoincrement())
+  nombre        String    @unique @db.VarChar(100)
+  descripcion   String?   @db.Text
+  icono         String?   @db.VarChar(20)
+  pesoPersonal  Int?      @map("peso_personal")
+
+  @@map("motivos_personales")
+}
+
+model Destrezas {
+  id                Int          @id @default(autoincrement())
+  nombre            String       @unique @db.VarChar(100)
+  categoria         String?      @db.VarChar(50)
+  nivelActual       Int?         @map("nivel_actual")
+  descripcion       String?      @db.Text
+  costoEnergetico   TipoEnergia? @map("costo_energetico")
+  mejorMomentoDia   String[]     @map("mejor_momento_dia") // Changed to String[]
+  requiereFlow      Boolean?     @map("requiere_flow")
+  notasContexto     String?      @map("notas_contexto") @db.Text
+  subtareasEstrategicas SubtareaEstrategica[]
+
+  @@map("destrezas")
+}
+
+model Dificultades {
+  id                  Int       @id @default(autoincrement())
+  nombre              String    @unique @db.VarChar(100)
+  categoria           String?   @db.VarChar(50)
+  nivelImpacto        Int?      @map("nivel_impacto")
+  descripcion         String?   @db.Text
+  estrategiaMitigacion String?  @map("estrategia_mitigacion") @db.Text
+
+  @@map("dificultades")
+}
+
+model MisionesVida {
+  id          Int       @id @default(autoincrement())
+  nombre      String    @unique @db.VarChar(100)
+  descripcion String?   @db.Text
+  vision      String?   @db.Text
+  prioridad   Int?
+
+  @@map("misiones_vida")
+}
+
+
+// --- Tablas Generativas ---
+
+model ProyectoEstrategico {
+  id Int @id @default(autoincrement())
+  nombre                    String    @db.VarChar(200)
+  descripcion               String?   @db.Text
+  areasIds                  Int[]     @map("areas_ids")
+  motivosIds                Int[]     @map("motivos_ids")
+  destrezasRequeridasIds    Int[]     @map("destrezas_requeridas_ids")
+  dificultadesIds           Int[]     @map("dificultades_ids")
+  misionesIds               Int[]     @map("misiones_ids")
+  justificacionEstrategica  Json?     @map("justificacion_estrategica")
+  objetivosSmart            Json?     @map("objetivos_smart")
+  fechaInicio               DateTime? @map("fecha_inicio") @db.Date
+  fechaFinEstimada          DateTime? @map("fecha_fin_estimada") @db.Date
+  estado                    TipoEstadoProyecto @default(idea)
+  prioridadGlobal           Decimal?  @map("prioridad_global") @db.Decimal(3, 2)
+  scoreMotivacional         Decimal?  @map("score_motivacional") @db.Decimal(3, 2)
+  scoreAlineacion           Decimal?  @map("score_alineacion") @db.Decimal(3, 2)
+  createdAt                 DateTime  @default(now()) @map("created_at")
+  updatedAt                 DateTime  @updatedAt @map("updated_at")
+
+  // Relaciones
+  tareasEstrategicas TareaEstrategica[]
+  logsGeneracion     LogGeneracionIA[]
+  ideasCapturadas    IdeaCapturada[]
+  tareasSimples      Tarea[]
+
+  @@map("proyectos_estrategicos")
+}
+
+model TareaEstrategica {
+  id                           Int                    @id @default(autoincrement())
+  proyectoId                   Int                    @map("proyecto_id")
+  proyecto                     ProyectoEstrategico    @relation(fields: [proyectoId], references: [id])
+  nombre                       String                 @db.VarChar(255)
+  descripcion                  String?                @db.Text
+  orden                        Int?
+  moscow                       TipoMoscow?
+  tiempoEstimadoHoras          Int?                   @map("tiempo_estimado_horas")
+  nivelRiesgo                  TipoRiesgo?            @map("nivel_riesgo")
+  prioridadVelocidadPerfeccion TipoEnfoque?           @map("prioridad_velocidad_perfeccion")
+  estadoKanban                 TipoEstadoKanban       @default(backlog) @map("estado_kanban")
+  fechaDone                    DateTime?              @map("fecha_done") @db.Timestamp
+  impacto                      TipoImpacto?           @map("impacto")
+  urgencia                     TipoUrgencia?          @map("urgencia")
+  eisenhower                   TipoEisenhower?        @map("eisenhower")
+  fechaInicio                  DateTime?              @map("fecha_inicio") @db.Date
+  fechaFin                     DateTime?              @map("fecha_fin") @db.Date
+  createdAt                    DateTime               @default(now()) @map("created_at")
+  updatedAt                    DateTime               @updatedAt @map("updated_at")
+  subtareasEstrategicas        SubtareaEstrategica[]
+
+  @@map("tareas_estrategicas")
+}
+
+model SubtareaEstrategica {
+  id                    Int                 @id @default(autoincrement())
+  tareaEstrategicaId    Int                 @map("tarea_estrategica_id")
+  tareaEstrategica      TareaEstrategica    @relation(fields: [tareaEstrategicaId], references: [id])
+  nombre                String              @db.VarChar(255)
+  estadoKanban          TipoEstadoKanban    @default(backlog) @map("estado_kanban")
+  fechaDone             DateTime?           @map("fecha_done") @db.Timestamp
+  tiempoEstimadoMinutos Int?                @map("tiempo_estimado_minutos")
+  moscow                TipoMoscow?
+  destrezaPrincipalId   Int?                @map("destreza_principal_id")
+  destrezaPrincipal     Destrezas?          @relation(fields: [destrezaPrincipalId], references: [id])
+  fechaInicio           DateTime?           @map("fecha_inicio") @db.Date
+  fechaFin              DateTime?           @map("fecha_fin") @db.Date
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+
+  @@map("subtareas_estrategicas")
+}
+
+model LogGeneracionIA {
+  id             Int       @id @default(autoincrement())
+  proyectoId     Int?      @map("proyecto_id")
+  proyecto       ProyectoEstrategico? @relation(fields: [proyectoId], references: [id])
+  tipoGeneracion String?   @map("tipo_generacion") @db.VarChar(50)
+  modeloIa       String?   @map("modelo_ia") @db.VarChar(100)
+  tokensUsados   Int?      @map("tokens_usados")
+  prompt         String?   @db.Text
+  respuesta      String?   @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@map("logs_generacion_ia")
+}
+
+// ============================================
+// Enums
+// ============================================
+
+enum Prioridad {
+  BAJA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+enum Categoria {
+  TRABAJO
+  PERSONAL
+  SOCIAL
+  OTRO
+}
+
+enum TipoMoscow {
+  must
+  should
+  could
+  wont
+}
+
+enum TipoEnfoque {
+  velocidad
+  perfeccion
+  balanceado
+}
+
+enum TipoLibertad {
+  receta
+  resultado
+  mixto
+}
+
+enum TipoRiesgo {
+  bajo
+  medio
+  alto
+  critico
+}
+
+enum TipoEnergia {
+  relax
+  baja
+  media
+  alta
+  pico
+}
+
+enum TipoEstadoProyecto {
+  idea
+  planificacion
+  en_curso
+  pausado
+  completado
+  cancelado
+  archivado
+}
+
+enum TipoEstadoTarea {
+  por_hacer
+  en_progreso
+  bloqueada
+  en_revision
+  completada
+  cancelada
+}
+
+enum TipoEstadoKanban {
+  freezer
+  backlog
+  waiting
+  todo
+  doing
+  done
+}
+
+enum TipoImpacto {
+  alto
+  medio
+  bajo
+}
+
+enum TipoUrgencia {
+  alta
+  media
+  baja
+}
+
+enum TipoEisenhower {
+  cuadrante_1
+  cuadrante_2
+  cuadrante_3
+  cuadrante_4
+}
+
+// ============================================
+// Transcripcion - Modelo original para compatibilidad con mateos-next-app
+// ============================================
 model Transcripcion {
-  id        Int      @id @default(autoincrement())
-  hora      DateTime @default(now()) @db.Timestamptz(6)
-  texto     String   @db.Text
-
-  // Audio storage
-  r2_url    String?  @db.VarChar(512)
-  r2_key    String?  @db.VarChar(256)
-
-  // Metadata de Telegram
+  id                 Int      @id @default(autoincrement())
+  hora               DateTime @default(now()) @db.Timestamptz(6)
+  texto              String   @db.Text
+  r2_url             String?  @db.VarChar(512)
+  r2_key             String?  @db.VarChar(256)
   telegram_file_id   String?  @db.VarChar(256)
   telegram_user_id   BigInt?
   telegram_message_id BigInt?
-
-  // Metadata del audio
   duracion_segundos  Int?
   tamano_bytes       BigInt?
-
-  // Auditoría
-  created_at DateTime @default(now()) @db.Timestamptz(6)
-  updated_at DateTime @updatedAt @db.Timestamptz(6)
-
-  // Estado de procesamiento
-  estado    EstadoProcesamiento @default(PROCESANDO)
-  error_msg String?  @db.Text
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @updatedAt @db.Timestamptz(6)
+  estado             EstadoProcesamiento @default(PROCESANDO)
+  error_msg          String?  @db.Text
 
   @@index([telegram_user_id])
   @@index([created_at])

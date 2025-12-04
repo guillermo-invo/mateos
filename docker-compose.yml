@@ -43,7 +43,7 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${DB_USER:-asistente}:${DB_PASSWORD:-n8npass}@postgres-db:5432/${DB_NAME:-transcripciones_db}
+      DATABASE_URL: postgresql://${DB_USER:-asistente}:${DB_PASSWORD:-n8npass}@postgres-db:5432/asistente_db
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
       R2_ACCESS_KEY: ${R2_ACCESS_KEY}
@@ -52,6 +52,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       WEBHOOK_AUTOMATIZACIONES_URL: http://automatizaciones:3100/webhook
+      WEBHOOK_AUTOMATIZACIONES_PROYECTO_URL: http://automatizaciones:3100/webhook/proyecto
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
@@ -63,6 +64,7 @@ services:
       - involucra-network
     volumes:
       - ./next-app/logs:/app/logs
+      - ./next-app/models-config.json:/app/models-config.json:ro
     ports:
       - "1400:3000"
 
@@ -85,9 +87,6 @@ services:
       MATEOS_DB_URL: postgresql://${DB_USER:-asistente}:${DB_PASSWORD:-n8npass}@postgres-db:5432/${DB_NAME:-transcripciones_db}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.6}
-      OPENAI_MODEL: gpt-4o-mini
-      OPENAI_TEMPERATURE: "1"
-      OPENAI_MAX_TOKENS: "4000"
       LOG_LEVEL: ${LOG_LEVEL:-info}
       # Resumen diario automático
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
@@ -104,6 +103,8 @@ services:
     networks:
       - app-network
       - involucra-network
+    volumes:
+      - ./automatizaciones/models-config.json:/app/models-config.json:ro
     ports:
       - "1410:3100"
 

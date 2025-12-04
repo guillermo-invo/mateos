@@ -13,7 +13,7 @@ export interface WebhookPayload {
 // Tipos para Detección de Keywords
 // ============================================
 
-export type TipoMensaje = 'tarea' | 'registro' | 'idea' | 'compromiso' | 'sin_clasificar';
+export type TipoMensaje = 'tarea' | 'registro' | 'idea' | 'compromiso' | 'sin_clasificar' | 'proyecto';
 
 export interface DetectionResult {
   tipo: TipoMensaje;
@@ -78,4 +78,54 @@ export interface ProcessorResult {
     ideas?: number;
   };
   error?: string;
+}
+
+// ============================================
+// Tipos para Generación de Proyectos por IA
+// ============================================
+
+export interface EstructuraProyecto {
+  proyecto: ProyectoGenerado;
+  tareas: TareaGenerada[];
+}
+
+export interface ProyectoGenerado {
+  justificacion_estrategica: Record<string, any>; // JSONB type
+  objetivos_smart?: Array<{
+    specific: string;
+    measurable: string;
+    achievable: string;
+    relevant: string;
+    timebound: string;
+  }>;
+  areas_ids: number[];
+  motivos_ids: number[];
+  destrezas_requeridas_ids: number[];
+  dificultades_ids: number[];
+  misiones_ids: number[];
+  prioridad_global?: number;
+  score_motivacional?: number;
+  score_alineacion?: number;
+  nombre?: string;
+  descripcion?: string;
+}
+
+export interface TareaGenerada {
+  nombre: string;
+  descripcion?: string;
+  orden: number;
+  moscow: 'must' | 'should' | 'could' | 'wont';
+  tiempo_estimado_horas: number;
+  nivel_riesgo: 'bajo' | 'medio' | 'alto' | 'critico';
+  impacto?: 'alto' | 'medio' | 'bajo';
+  urgencia?: 'alta' | 'media' | 'baja';
+  prioridad_velocidad_perfeccion?: 'velocidad' | 'perfeccion' | 'balanceado';
+  subtareas: SubtareaGenerada[];
+}
+
+export interface SubtareaGenerada {
+  titulo: string;
+  tiempo_estimado_minutos?: number;
+  moscow?: 'must' | 'should' | 'could' | 'wont';
+  destreza_principal_id?: number | null;
 }
