@@ -11,6 +11,7 @@ import {
   useSensors,
   PointerSensor,
   closestCorners,
+  useDroppable,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useSortable } from '@dnd-kit/sortable';
@@ -53,16 +54,21 @@ interface Props {
 
 // --- 2. Componentes Auxiliares ---
 
-// Draggable Subtask Card
+// Draggable Subtask Card that also acts as a droppable
 const DraggableSubtaskCard = ({ subtask }: { subtask: Subtask }) => {
   const {
     attributes,
     listeners,
-    setNodeRef,
+    setNodeRef: setDraggableRef,
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: subtask.id });
+  } = useSortable({
+    id: subtask.id,
+    data: {
+      status: subtask.status, // Store the current status for dropping
+    }
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -72,48 +78,17 @@ const DraggableSubtaskCard = ({ subtask }: { subtask: Subtask }) => {
 
   return (
     <div
-      ref={setNodeRef}
+      ref={setDraggableRef}
       style={style}
       {...attributes}
       {...listeners}
       className="cursor-grab active:cursor-grabbing"
     >
       <Card shadow="sm" className="w-full mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600 transition-colors">
-        <CardBody className="p-3 text-small flex flex-col gap-1">
+        <CardBody className="p-3 text-small flex flex-col gap-2">
           <p className="font-semibold text-gray-800 dark:text-gray-100">{subtask.title}</p>
-          <div className="text-gray-600 dark:text-gray-400 text-xs flex flex-col">
-            <span>Est: {subtask.estimate}</span>
-            <div className="flex items-center gap-1 mt-1">
-              <span>MoSCoW:</span>
-              <Chip
-                size="sm"
-                variant="flat"
-                color={
-                  subtask.moscow === 'Must' ? "danger" :
-                  subtask.moscow === 'Should' ? "warning" :
-                  "default"
-                }
-              >
-                {subtask.moscow}
-              </Chip>
-            </div>
-          </div>
-        </CardBody>
-      </Card>
-    </div>
-  );
-};
-
-// Static Subtask Card for Overlay
-const SubtaskCard = ({ subtask }: { subtask: Subtask }) => {
-  return (
-    <Card shadow="lg" className="w-full bg-white dark:bg-gray-800 border-2 border-blue-500">
-      <CardBody className="p-3 text-small flex flex-col gap-1">
-        <p className="font-semibold text-gray-800 dark:text-gray-100">{subtask.title}</p>
-        <div className="text-gray-600 dark:text-gray-400 text-xs flex flex-col">
-          <span>Est: {subtask.estimate}</span>
-          <div className="flex items-center gap-1 mt-1">
-            <span>MoSCoW:</span>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-gray-600 dark:text-gray-400">{subtask.estimate}</span>
             <Chip
               size="sm"
               variant="flat"
@@ -126,6 +101,31 @@ const SubtaskCard = ({ subtask }: { subtask: Subtask }) => {
               {subtask.moscow}
             </Chip>
           </div>
+        </CardBody>
+      </Card>
+    </div>
+  );
+};
+
+// Static Subtask Card for Overlay
+const SubtaskCard = ({ subtask }: { subtask: Subtask }) => {
+  return (
+    <Card shadow="lg" className="w-full bg-white dark:bg-gray-800 border-2 border-blue-500">
+      <CardBody className="p-3 text-small flex flex-col gap-2">
+        <p className="font-semibold text-gray-800 dark:text-gray-100">{subtask.title}</p>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-gray-600 dark:text-gray-400">{subtask.estimate}</span>
+          <Chip
+            size="sm"
+            variant="flat"
+            color={
+              subtask.moscow === 'Must' ? "danger" :
+              subtask.moscow === 'Should' ? "warning" :
+              "default"
+            }
+          >
+            {subtask.moscow}
+          </Chip>
         </div>
       </CardBody>
     </Card>
@@ -136,18 +136,33 @@ const SubtaskCard = ({ subtask }: { subtask: Subtask }) => {
 const DroppableKanbanColumn = ({
   status,
   colorClass,
-  subtasks
+  subtasks,
+  taskId
 }: {
   status: SubtaskStatus,
   colorClass: string,
-  subtasks: Subtask[]
+  subtasks: Subtask[],
+  taskId: string
 }) => {
   const filteredTasks = subtasks.filter(s => s.status === status);
 
+  // Create unique ID per task and status to avoid conflicts
+  const droppableId = `${taskId}-${status}`;
+
+  const { setNodeRef, isOver } = useDroppable({
+    id: droppableId,
+    data: {
+      status, // Store status in data for retrieval in handleDragEnd
+    }
+  });
+
   return (
     <div
+      ref={setNodeRef}
       data-status={status}
-      className={`h-full p-2 rounded-lg ${colorClass} dark:bg-opacity-40 flex flex-col gap-2 min-h-[150px] transition-colors`}
+      className={`h-full p-2 rounded-lg ${colorClass} dark:bg-opacity-40 flex flex-col gap-2 min-h-[150px] transition-colors ${
+        isOver ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+      }`}
     >
       {filteredTasks.map(subtask => (
         <DraggableSubtaskCard key={subtask.id} subtask={subtask} />
@@ -157,14 +172,40 @@ const DroppableKanbanColumn = ({
 };
 
 // Cabecera fija de la tabla (Waiting, Todo, etc.)
-const KanbanHeaderRow = () => {
+const KanbanHeaderRow = ({
+  totals
+}: {
+  totals: Record<SubtaskStatus, number>
+}) => {
+  // Helper para formatear minutos a horas y minutos
+  const formatMinutes = (mins: number): string => {
+    if (mins === 0) return '0min';
+    const hours = Math.floor(mins / 60);
+    const minutes = mins % 60;
+    if (hours === 0) return `${minutes}min`;
+    if (minutes === 0) return `${hours}h`;
+    return `${hours}h ${minutes}min`;
+  };
+
   return (
     <div className="grid grid-cols-[220px_1fr_1fr_1fr_1fr] gap-4 mb-2 px-4 font-bold text-center text-gray-700 dark:text-gray-300 uppercase text-sm sticky top-0 bg-white dark:bg-gray-900 z-10 py-2">
       <div>{/* Espacio vacío alineado con la jerarquía */}</div>
-      <div className="bg-gray-200 dark:bg-gray-700 rounded py-1">Waiting</div>
-      <div className="bg-blue-200 dark:bg-blue-900 rounded py-1">Todo</div>
-      <div className="bg-amber-200 dark:bg-amber-900 rounded py-1">Doing</div>
-      <div className="bg-green-200 dark:bg-green-900 rounded py-1">Done</div>
+      <div className="bg-gray-200 dark:bg-gray-700 rounded py-2 flex flex-col">
+        <span>Waiting</span>
+        <span className="text-xs font-normal normal-case mt-1">{formatMinutes(totals.waiting)}</span>
+      </div>
+      <div className="bg-blue-200 dark:bg-blue-900 rounded py-2 flex flex-col">
+        <span>Todo</span>
+        <span className="text-xs font-normal normal-case mt-1">{formatMinutes(totals.todo)}</span>
+      </div>
+      <div className="bg-amber-200 dark:bg-amber-900 rounded py-2 flex flex-col">
+        <span>Doing</span>
+        <span className="text-xs font-normal normal-case mt-1">{formatMinutes(totals.doing)}</span>
+      </div>
+      <div className="bg-green-200 dark:bg-green-900 rounded py-2 flex flex-col">
+        <span>Done</span>
+        <span className="text-xs font-normal normal-case mt-1">{formatMinutes(totals.done)}</span>
+      </div>
     </div>
   );
 };
@@ -182,6 +223,35 @@ const KanbanTaskView: React.FC<Props> = ({ data: initialData }) => {
       },
     })
   );
+
+  // Función para calcular totales de minutos por status
+  const calculateTotals = (): Record<SubtaskStatus, number> => {
+    const totals: Record<SubtaskStatus, number> = {
+      waiting: 0,
+      todo: 0,
+      doing: 0,
+      done: 0,
+    };
+
+    data.forEach((area) => {
+      area.projects.forEach((project) => {
+        project.tasks.forEach((task) => {
+          task.subtasks.forEach((subtask) => {
+            // Parse estimate string (e.g., "120min" or "N/A")
+            if (subtask.estimate && subtask.estimate !== 'N/A') {
+              const match = subtask.estimate.match(/(\d+)min/);
+              if (match) {
+                const minutes = parseInt(match[1], 10);
+                totals[subtask.status] += minutes;
+              }
+            }
+          });
+        });
+      });
+    });
+
+    return totals;
+  };
 
   // Configuración de columnas y sus colores
   const columnsConfig: { status: SubtaskStatus, color: string }[] = [
@@ -214,8 +284,8 @@ const KanbanTaskView: React.FC<Props> = ({ data: initialData }) => {
 
     if (!over) return;
 
-    // Determine the new status based on where it was dropped
-    const newStatus = getStatusFromDroppable(over.id as string);
+    // Extract status from droppable data
+    const newStatus = over.data.current?.status as SubtaskStatus | undefined;
     if (!newStatus) return;
 
     // Find the subtask and update it
@@ -316,30 +386,6 @@ const KanbanTaskView: React.FC<Props> = ({ data: initialData }) => {
     }
   };
 
-  // Helper function to determine status from droppable ID
-  const getStatusFromDroppable = (id: string): SubtaskStatus | null => {
-    // The droppable ID should be in format: "waiting", "todo", "doing", "done"
-    // Or it could be a subtask ID (if dropped on a subtask)
-
-    // First check if it's a status
-    if (['waiting', 'todo', 'doing', 'done'].includes(id)) {
-      return id as SubtaskStatus;
-    }
-
-    // If dropped on a subtask, find that subtask's status
-    for (const area of data) {
-      for (const project of area.projects) {
-        for (const task of project.tasks) {
-          const subtask = task.subtasks.find(s => s.id === id);
-          if (subtask) {
-            return subtask.status;
-          }
-        }
-      }
-    }
-
-    return null;
-  };
 
   return (
     <DndContext
@@ -350,7 +396,7 @@ const KanbanTaskView: React.FC<Props> = ({ data: initialData }) => {
     >
       <div className="w-full max-w-7xl mx-auto p-4 bg-white dark:bg-gray-900">
         {/* Cabecera de columnas fija */}
-        <KanbanHeaderRow />
+        <KanbanHeaderRow totals={calculateTotals()} />
 
         {/* Nivel 1: Áreas de Vida */}
         <Accordion variant="splitted" className="px-0" defaultExpandedKeys="all" selectionMode="multiple">
@@ -379,13 +425,16 @@ const KanbanTaskView: React.FC<Props> = ({ data: initialData }) => {
                       {project.tasks.map((task) => (
                         <AccordionItem key={task.id} title={<span className="text-gray-600 dark:text-gray-300">{task.title}</span>}>
                           {/* CONTENIDO DE LA TAREA: El Grid Kanban */}
-                          <div className="grid grid-cols-[1fr_1fr_1fr_1fr] gap-4 py-2">
+                          <div className="grid grid-cols-[220px_1fr_1fr_1fr_1fr] gap-4 py-2">
+                            {/* Espacio vacío para alinear con el header */}
+                            <div></div>
                             {columnsConfig.map((col) => (
                               <DroppableKanbanColumn
-                                key={col.status}
+                                key={`${task.id}-${col.status}`}
                                 status={col.status}
                                 colorClass={col.color}
                                 subtasks={task.subtasks}
+                                taskId={task.id}
                               />
                             ))}
                           </div>

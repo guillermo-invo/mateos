@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, FormEvent, useEffect } from 'react';
+import React, { useState, FormEvent, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 interface Option {
@@ -14,7 +14,7 @@ interface ProjectIdea {
   descripcion?: string;
 }
 
-export default function CrearProyectoPage() {
+function CrearProyectoContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [nombre, setNombre] = useState('');
@@ -299,5 +299,13 @@ export default function CrearProyectoPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function CrearProyectoPage() {
+  return (
+    <Suspense fallback={<div className="p-6">Cargando...</div>}>
+      <CrearProyectoContent />
+    </Suspense>
   );
 }
