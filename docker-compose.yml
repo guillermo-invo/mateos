@@ -131,9 +131,35 @@ services:
     volumes:
       - ./telegram-bot/logs:/app/logs
 
+  # ============================================
+  # Obsidian (Web Access via KasmVNC)
+  # ============================================
+  obsidian:
+    image: lscr.io/linuxserver/obsidian:latest
+    container_name: mateos-obsidian
+    restart: unless-stopped
+    environment:
+      - PUID=1001
+      - PGID=1001
+      - TZ=${TZ:-America/Montevideo}
+    volumes:
+      - ./obsidian:/config
+      - /home/azureuser/obsidian:/vaults
+    ports:
+      - "1420:3000"
+      - "1421:3001"
+    networks:
+      - app-network
+      - involucra-network
+    security_opt:
+      - seccomp:unconfined
+    shm_size: "1gb"
+
 volumes:
   postgres-data:
     driver: local
+  # obsidianGfork:  # MIGRADO A BIND MOUNT: /home/azureuser/obsidian (2025-12-26)
+  #   driver: local
 
 networks:
   app-network:

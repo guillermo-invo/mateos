@@ -47,7 +47,7 @@ Gestión de tiempo y tareas para personas con TDAH que necesitan:
 ### Integraciones Externas
 - **Telegram Bot:** Entrada principal de notas de voz
 - **Google Calendar API:** Sincronización de bloques de tiempo (chunks)
-- **Obsidian:** Planificación semanal y review (via markdown files)
+- **Obsidian:** Segundo cerebro, planificación semanal (Obsidian Sync habilitado, KasmVNC para acceso web)
 - **n8n:** Orquestación de workflows (transcripción, procesamiento IA)
 
 ---
@@ -81,6 +81,9 @@ Gestión de tiempo y tareas para personas con TDAH que necesitan:
 │   ├── python/
 │   │   └── generar_instancias_recurrentes.py  # Generador automático
 │   └── health-check.sh          # Monitoreo del sistema
+│
+├── obsidian/                    # Configuración de Obsidian (KasmVNC)
+│   └── (configuración interna del contenedor)
 │
 ├── backups/                     # Backups automáticos de PostgreSQL
 │   └── asistente_db_backup_*.sql.gz
@@ -417,10 +420,19 @@ duracion_sesion_foco_minutos: 90   -- Pomodoro extendido
 
 ### Obsidian
 - **Propósito:** Segundo cerebro, planificación semanal, contexto vivo
-- **Archivos clave:**
+- **Implementación:** Contenedor Docker con KasmVNC (LinuxServer Obsidian)
+- **Storage:** Bind mount en `/home/azureuser/obsidian` (migrado desde volume `obsidianGfork` el 2025-12-26)
+- **Obsidian Sync:** Habilitado, sincronización 24/7 bidireccional (PC ↔ Cloud ↔ Server)
+- **Acceso web:** `mateos.involucrate.lat/obsidian` (DESHABILITADO por seguridad, solo habilitar para mantenimiento/configuración)
+- **Puertos:** 1420:3000 (web), 1421:3001 (https - no usado)
+- **Redes:** `app-network`, `involucra-network` (para acceso desde nginx)
+- **Permisos:** PUID=1001, PGID=1001 (matching azureuser UID/GID)
+- **Archivos clave en vault:**
   - `Periodicas/Weekly/YYYY-WXX-contexto.md` (planificación semanal)
   - `Today.md` (generado cada mañana)
-- **Flow:** Mateos genera markdown → Usuario edita → Mateos lee cambios
+- **Flow:** Mateos genera markdown → Usuario edita en PC/móvil via Obsidian Sync → Mateos lee cambios desde `/home/azureuser/obsidian`
+- **Acceso a archivos:** Scripts y aplicaciones pueden acceder directamente a `/home/azureuser/obsidian/ObsidianGfork/` sin necesidad de sudo
+- **IMPORTANTE:** El vault sincroniza automáticamente. NO requiere acceso web para funcionamiento normal del Sync.
 
 ### Cloudflare R2
 - **Propósito:** Storage de archivos de audio
@@ -611,10 +623,16 @@ npx prisma migrate dev --name nombre_descriptivo
 docker ps
 
 # Logs de Next.js
-docker logs -f mateos-nextjs
+docker logs -f transcripcion-api
+
+# Logs de Obsidian
+docker logs -f mateos-obsidian
 
 # Restart de servicios
 docker-compose restart
+
+# Acceder al vault de Obsidian (desde el host)
+ls -la /home/azureuser/obsidian/ObsidianGfork/
 ```
 
 ---
