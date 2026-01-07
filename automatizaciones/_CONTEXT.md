@@ -124,6 +124,46 @@ src/
 
 ## ENDPOINTS
 
+### Generación de Proyectos
+
+#### POST /generar-proyecto
+Genera y guarda un proyecto estratégico completo usando IA.
+
+**Body:**
+```json
+{
+  "nombre": "string (opcional)",
+  "descripcion": "string (requerido)",
+  "areasIds": [1, 2],
+  "motivosIds": [1, 3],
+  "nuevaAreaVida": "string (opcional)",
+  "nuevoMotivoPersonal": "string (opcional)",
+  "documentosUrls": ["url1", "url2"] (opcional),
+  "ideaId": 123 (opcional)
+}
+```
+
+**Flujo:**
+1. Validar payload con Zod
+2. Generar estructura con IA (`generarEstructuraProyecto`)
+3. Hacer merge de datos usuario + IA (usuario tiene prioridad)
+4. Guardar proyecto completo con transacción (`guardarProyectoGenerado`)
+5. Si ideaId presente, marcar idea como implementada
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Proyecto generado y guardado exitosamente",
+  "projectId": 42
+}
+```
+
+**⚠️ IMPORTANTE:**
+- Timeout: Puede tardar 10-30 segundos (generación IA)
+- Transacción Prisma: 30 segundos timeout (configurado en `guardar-proyecto.ts`)
+- Datos usuario (nombre, áreas, motivos) tienen PRIORIDAD sobre IA
+
 ### Webhooks
 
 #### POST /webhook
@@ -193,19 +233,53 @@ TELEGRAM_BOT_TOKEN="..."
 TELEGRAM_CHAT_ID="..."   # Para notificaciones
 
 # Servidor
-PORT=3002
+PORT=3100 (interno Docker: 3100, expuesto: 1410)
 NODE_ENV=production
 
 # Timezone (importante para CRON)
 TZ=America/Montevideo
 ```
 
+### Modelos de IA (models-config.json)
+
+```json
+{
+  "transcription": {
+    "provider": "openai",
+    "model": "whisper-v4",
+    "description": "Transcripción de alta fidelidad optimizada para 2026."
+  },
+  "extraction": {
+    "model": "gpt-5.1-mini",
+    "temperature": 0,
+    "maxTokens": 4000,
+    "description": "Extracción estructurada (JSON Mode) con latencia mínima."
+  },
+  "projectCreation": {
+    "model": "gpt-5.1",
+    "temperature": 0.8,
+    "maxTokens": 16000,
+    "description": "Generación creativa y razonamiento complejo."
+  },
+  "dailySummary": {
+    "model": "gpt-5-mini",
+    "temperature": 0.3,
+    "maxTokens": 2000,
+    "description": "Resumen ejecutivo optimizado para tokens."
+  }
+}
+```
+
+**⚠️ NO modificar modelos sin confirmar disponibilidad en OpenAI**
+
 ### Docker Compose
 
-**Service name:** `automatizaciones`
-**Port:** 3002 (interno Docker network)
-**Depends on:** `postgres`
+**Service name:** `mateos-automatizaciones`
+**Container name:** `mateos-automatizaciones`
+**Port mapping:** `1410:3100` (host:container)
+**Depends on:** `transcripcion-postgres`
 **Restart policy:** `unless-stopped`
+**Health check:** `http://localhost:3100/health`
 
 ---
 
@@ -279,5 +353,25 @@ cron.schedule('0 20 * * *', async () => {
 
 ---
 
-**Última actualización:** 2025-12-26
-**Versión:** 1.0
+## CAMBIOS RECIENTES
+
+### 2026-01-07: Generación de Proyectos con IA
+
+**Agregado:**
+- Endpoint `/generar-proyecto` para generación completa con IA
+- Merge de datos usuario + IA (usuario tiene prioridad)
+- Transacción Prisma con timeout 30s
+- Estado inicial `'planificacion'` en lugar de `'idea'`
+- Guardado completo de campos: objetivos_smart, prioridad_global, campos en tareas
+
+**Archivos modificados:**
+- `src/index.ts`: Agregado endpoint y schema de validación
+- `src/ia/generador-proyectos.ts`: Contexto personal desde BD
+- `src/ia/guardar-proyecto.ts`: Campos completos, estado planificacion
+- `models-config.json`: Modelos GPT-5.1, GPT-5.1-mini
+
+---
+
+**Última actualización:** 2026-01-07
+**Cambios:** Generación de proyectos con IA, merge usuario/IA, campos completos
+**Versión:** 1.1

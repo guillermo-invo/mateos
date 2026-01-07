@@ -8,9 +8,10 @@ Módulos de procesamiento de inteligencia artificial para generación de proyect
 
 ## STACK TÉCNICO ESPECÍFICO
 
-- **OpenAI API:** GPT-4 Turbo (gpt-4-turbo-preview)
+- **OpenAI API:** GPT-5.1 (projectCreation), GPT-5.1-mini (extraction), GPT-5-mini (summaries)
 - **Validación:** Zod 3.22.4
 - **Prisma:** 6.18.0 (persistencia)
+- **Configuración:** `models-config.json` (modelos por tipo de tarea)
 
 ---
 
@@ -254,17 +255,16 @@ export async function guardarProyecto(proyecto: ProyectoGenerado): Promise<strin
 
 ### Modelos GPT
 
-**Actual:** `gpt-4-turbo-preview`
+**Configuración actual:** (desde `models-config.json`)
+- **projectCreation:** `gpt-5.1` (temp: 0.8, maxTokens: 16000) - Generación creativa
+- **extraction:** `gpt-5.1-mini` (temp: 0, maxTokens: 4000) - Extracción estructurada
+- **dailySummary:** `gpt-5-mini` (temp: 0.3, maxTokens: 2000) - Resúmenes
+- **transcription:** `whisper-v4` - Transcripción de audio
 
-**Alternativas:**
-- `gpt-4-turbo`: Más rápido, mismo precio
-- `gpt-3.5-turbo`: 10x más barato, menor calidad
-
-**Decisión:** Usar GPT-4 Turbo para calidad, optimizar tokens para reducir costos.
-
-**⚠️ NO usar GPT-4 legacy:**
-- `gpt-4` (sin "turbo") es más lento y caro
-- `gpt-4-32k` es innecesario (no usamos contextos tan largos)
+**⚠️ IMPORTANTE:**
+- Los modelos `gpt-5.1`, `gpt-5.1-mini`, `whisper-v4` son específicos de OpenAI 2026
+- NO reemplazar con modelos legacy sin confirmar disponibilidad
+- Configuración centralizada en `getModelConfig()` de `model-config.ts`
 
 ### Validación
 
@@ -366,5 +366,71 @@ const parsed = JSON.parse(jsonString)
 
 ---
 
-**Última actualización:** 2025-12-26
-**Versión:** 1.0
+## FLUJO DE GENERACIÓN CON MERGE DE DATOS
+
+### Prioridad de Datos: Usuario > IA
+
+**Problema original:** La IA generaba áreas y motivos, sobrescribiendo lo que el usuario seleccionó en el formulario.
+
+**Solución implementada:**
+
+1. **Frontend envía:**
+   - `nombre`: Nombre del proyecto (usuario)
+   - `descripcion`: Descripción (usuario)
+   - `areasIds`: Áreas seleccionadas (usuario)
+   - `motivosIds`: Motivos seleccionados (usuario)
+
+2. **Backend (automatizaciones) hace merge:**
+```typescript
+const mergedEstructura = {
+  ...estructuraGenerada,
+  proyecto: {
+    ...estructuraGenerada.proyecto,
+    nombre: nombre || estructuraGenerada.proyecto.nombre || 'Proyecto sin nombre',
+    descripcion: descripcion, // SIEMPRE del usuario
+    areas_ids: areasIds?.length > 0 ? areasIds : estructuraGenerada.proyecto.areas_ids,
+    motivos_ids: motivosIds?.length > 0 ? motivosIds : estructuraGenerada.proyecto.motivos_ids,
+  }
+}
+```
+
+3. **IA genera:**
+   - Justificación estratégica
+   - Objetivos SMART
+   - Destrezas requeridas
+   - Dificultades
+   - Misiones de vida
+   - Tareas y subtareas
+   - Scores (motivacional, alineación, prioridad global)
+
+### Estado Inicial de Proyectos
+
+**Estado por defecto:** `'planificacion'` (NO `'idea'`)
+
+**Razón:** Proyectos generados con IA ya están listos para planificarse, no son simples ideas.
+
+### Campos Guardados
+
+**Proyecto:**
+- ✅ `nombre`, `descripcion` (usuario)
+- ✅ `justificacionEstrategica`, `objetivosSmart` (IA)
+- ✅ `areasIds`, `motivosIds` (usuario con fallback IA)
+- ✅ `destrezasRequeridasIds`, `dificultadesIds`, `misionesIds` (IA)
+- ✅ `prioridadGlobal`, `scoreMotivacional`, `scoreAlineacion` (IA)
+- ✅ `estado: 'planificacion'`
+
+**Tareas:**
+- ✅ `nombre`, `descripcion` (IA)
+- ✅ `orden`, `moscow`, `tiempoEstimadoHoras` (IA)
+- ✅ `nivelRiesgo`, `impacto`, `urgencia` (IA)
+- ✅ `prioridadVelocidadPerfeccion` (IA)
+
+**Subtareas:**
+- ✅ `nombre` (IA, campo llamado `titulo` en estructura)
+- ✅ `tiempoEstimadoMinutos`, `moscow` (IA)
+
+---
+
+**Última actualización:** 2026-01-07
+**Cambios:** Agregado merge de datos usuario/IA, estado inicial 'planificacion', campos completos en tareas/subtareas
+**Versión:** 1.1

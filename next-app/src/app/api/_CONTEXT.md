@@ -214,9 +214,11 @@ export async function GET(request: NextRequest) {
 
 ### Proyectos Estratégicos
 - `GET /api/proyectos-estrategicos`: Lista proyectos V2 con planificación
-- `POST /api/proyectos-estrategicos`: Crear proyecto V2
-- `GET /api/proyectos-estrategicos/[id]`: Detalle proyecto V2
+- `POST /api/proyectos-estrategicos`: Crear proyecto V2 (legacy, sin IA)
+- `POST /api/proyectos-estrategicos/generar`: Generar proyecto con IA (reenvía a automatizaciones)
+- `GET /api/proyectos-estrategicos/[id]`: Detalle proyecto V2 (serializa Decimals a números)
 - `PATCH /api/proyectos-estrategicos/[id]`: Actualizar proyecto V2
+- `DELETE /api/proyectos-estrategicos/[id]`: Eliminar proyecto V2
 
 ### Tareas Estratégicas
 - `GET /api/tareas-estrategicas`: Lista tareas (filtros: estado, proyecto)
@@ -347,5 +349,71 @@ return NextResponse.json(data, {
 
 ---
 
-**Última actualización:** 2025-12-26
-**Versión:** 1.0
+## INTEGRACIÓN CON AUTOMATIZACIONES
+
+### POST /api/proyectos-estrategicos/generar
+
+**Propósito:** Endpoint que reenvía la creación de proyectos con IA al microservicio de automatizaciones.
+
+**Flujo:**
+```
+Frontend (form)
+  → POST /api/proyectos-estrategicos/generar
+  → Reenvía a http://automatizaciones:1410/generar-proyecto
+  → Automatizaciones procesa con IA
+  → Retorna project ID
+```
+
+**Input (desde frontend):**
+```typescript
+{
+  nombre: string,                    // Nombre del proyecto (usuario)
+  descripcion: string,               // Descripción (usuario)
+  areasIds: number[],                // Áreas seleccionadas (usuario)
+  motivosIds: number[],              // Motivos seleccionados (usuario)
+  nuevaAreaVida?: string,            // Nueva área si usuario escribió
+  nuevoMotivoPersonal?: string,      // Nuevo motivo si usuario escribió
+  ideaId?: number                    // ID de idea si se convierte
+}
+```
+
+**⚠️ IMPORTANTE:**
+- El endpoint REENVÍA todos los datos del formulario a automatizaciones
+- NO procesa la IA en Next.js (delegado a automatizaciones)
+- Los datos del usuario (nombre, áreas, motivos) tienen PRIORIDAD sobre IA
+- Timeout: 60s (generación con IA puede tardar)
+
+### Serialización de Decimals
+
+**Problema:** Prisma devuelve campos `Decimal` como strings en JSON (`"8.5"` en lugar de `8.5`)
+
+**Solución:** `serializeProyectoResponse()` en `[id]/route.ts`
+
+**Campos afectados:**
+- `prioridadGlobal`
+- `scoreMotivacional`
+- `scoreAlineacion`
+
+**Implementación:**
+```typescript
+const serializeProyectoResponse = <T>(data: T): T => {
+  const serialized = serializePrismaData(data)
+  
+  // Convertir strings a números
+  decimalFields.forEach(field => {
+    const value = serialized[field]
+    if (value !== null && value !== undefined) {
+      const numValue = parseFloat(String(value))
+      serialized[field] = Number.isFinite(numValue) ? numValue : null
+    }
+  })
+  
+  return serialized
+}
+```
+
+---
+
+**Última actualización:** 2026-01-07
+**Cambios:** Agregada generación con IA, serialización de Decimals, integración con automatizaciones
+**Versión:** 1.1
