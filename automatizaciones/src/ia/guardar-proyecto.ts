@@ -17,13 +17,16 @@ export async function guardarProyectoGenerado(
         nombre: estructura.proyecto.nombre || "Proyecto sin nombre",
         descripcion: estructura.proyecto.descripcion,
         justificacionEstrategica: estructura.proyecto.justificacion_estrategica,
-        areasIds: estructura.proyecto.areas_ids,
-        motivosIds: estructura.proyecto.motivos_ids,
-        destrezasRequeridasIds: estructura.proyecto.destrezas_requeridas_ids,
-        dificultadesIds: estructura.proyecto.dificultades_ids,
-        misionesIds: estructura.proyecto.misiones_ids,
-        scoreMotivacional: estructura.proyecto.score_motivacional,
-        scoreAlineacion: estructura.proyecto.score_alineacion,
+        objetivosSmart: estructura.proyecto.objetivos_smart ? estructura.proyecto.objetivos_smart : undefined,
+        areasIds: estructura.proyecto.areas_ids || [],
+        motivosIds: estructura.proyecto.motivos_ids || [],
+        destrezasRequeridasIds: estructura.proyecto.destrezas_requeridas_ids || [],
+        dificultadesIds: estructura.proyecto.dificultades_ids || [],
+        misionesIds: estructura.proyecto.misiones_ids || [],
+        prioridadGlobal: estructura.proyecto.prioridad_global || null,
+        scoreMotivacional: estructura.proyecto.score_motivacional || null,
+        scoreAlineacion: estructura.proyecto.score_alineacion || null,
+        estado: 'planificacion', // Changed from default 'idea' to 'planificacion'
       }
     });
     
@@ -33,21 +36,29 @@ export async function guardarProyectoGenerado(
         data: {
           proyectoId: proyecto.id,
           nombre: tareaData.nombre,
+          descripcion: tareaData.descripcion || null,
           orden: tareaData.orden,
           moscow: tareaData.moscow,
-          tiempoEstimadoHoras: tareaData.tiempo_estimado_horas,
-          nivelRiesgo: tareaData.nivel_riesgo,
+          tiempoEstimadoHoras: tareaData.tiempo_estimado_horas || null,
+          nivelRiesgo: tareaData.nivel_riesgo || 'medio',
+          impacto: tareaData.impacto || null,
+          urgencia: tareaData.urgencia || null,
+          prioridadVelocidadPerfeccion: tareaData.prioridad_velocidad_perfeccion || null,
         }
       });
       
       // 3. Crear subtareas
-      for (const subtareaData of tareaData.subtareas) {
-        await tx.subtareaEstrategica.create({
-          data: {
-            tareaEstrategicaId: tarea.id,
-            nombre: subtareaData.titulo,
-          }
-        });
+      if (tareaData.subtareas && tareaData.subtareas.length > 0) {
+        for (const subtareaData of tareaData.subtareas) {
+          await tx.subtareaEstrategica.create({
+            data: {
+              tareaEstrategicaId: tarea.id,
+              nombre: subtareaData.titulo,
+              tiempoEstimadoMinutos: subtareaData.tiempo_estimado_minutos || null,
+              moscow: subtareaData.moscow || null,
+            }
+          });
+        }
       }
     }
     

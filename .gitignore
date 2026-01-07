@@ -54,3 +54,8 @@ docker-compose.override.yml
 .npm
 .eslintcache
 .yarn/
+
+# Google Calendar Credentials
+secrets/
+google-calendar-service-account.json
+*service-account*.json

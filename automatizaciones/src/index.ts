@@ -33,7 +33,12 @@ const WebhookPayloadSchema = z.object({
 });
 
 const GenerarProyectoPayloadSchema = z.object({
+  nombre: z.string().optional(),
   descripcion: z.string().min(1),
+  areasIds: z.array(z.number().int()).optional(),
+  motivosIds: z.array(z.number().int()).optional(),
+  nuevaAreaVida: z.string().optional(),
+  nuevoMotivoPersonal: z.string().optional(),
   documentosUrls: z.array(z.string().url()).optional(),
   ideaId: z.number().int().positive().optional(),
 });
@@ -194,20 +199,31 @@ app.post('/generar-proyecto', async (req: Request, res: Response) => {
       });
     }
 
-    const { descripcion, documentosUrls, ideaId } = validationResult.data;
+    const { nombre, descripcion, areasIds, motivosIds, nuevaAreaVida, nuevoMotivoPersonal, documentosUrls, ideaId } = validationResult.data;
 
     // 1. Generar estructura del proyecto con IA
     const estructuraGenerada = await generarEstructuraProyecto(descripcion, documentosUrls);
 
-    // 2. Guardar el proyecto generado en la BD
-    // (Need to pass AI model details and token usage from generarEstructuraProyecto)
-    // For now, placeholders for modelIA, tokensUsados, prompt, respuesta
+    // 2. Merge user input with AI generated data
+    // User input takes precedence for areas and motivos
+    const mergedEstructura = {
+      ...estructuraGenerada,
+      proyecto: {
+        ...estructuraGenerada.proyecto,
+        nombre: nombre || estructuraGenerada.proyecto.nombre || 'Proyecto sin nombre',
+        descripcion: descripcion, // Always use user description
+        areas_ids: areasIds && areasIds.length > 0 ? areasIds : estructuraGenerada.proyecto.areas_ids,
+        motivos_ids: motivosIds && motivosIds.length > 0 ? motivosIds : estructuraGenerada.proyecto.motivos_ids,
+      }
+    };
+
+    // 3. Guardar el proyecto generado en la BD
     const projectId = await guardarProyectoGenerado(
-      estructuraGenerada,
-      "claude-3-5-sonnet-20241022", // Placeholder for modelIA
-      1000, // Placeholder for tokensUsados
-      descripcion, // Placeholder for prompt
-      JSON.stringify(estructuraGenerada) // Placeholder for respuesta
+      mergedEstructura,
+      "gpt-5.1", // Model used
+      1000, // Placeholder for tokensUsados (TODO: get from OpenAI response)
+      descripcion,
+      JSON.stringify(estructuraGenerada)
     );
 
     // If an ideaId was provided, update the IdeaCapturada

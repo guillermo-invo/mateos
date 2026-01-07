@@ -100,8 +100,104 @@ Gestión de tiempo y tareas para personas con TDAH que necesitan:
 
 ## 🗄️ Base de Datos PostgreSQL
 
-### Nombre de la base de datos
-`mateos` (usuario: `postgres`)
+### Ubicación y Conexión
+
+**Contenedor Docker:** `transcripcion-postgres`
+- **Imagen:** `postgres:15.5-alpine`
+- **Base de datos:** `asistente_db`
+- **Usuario:** `asistente`
+- **Password:** `n8npass`
+- **Puerto host:** `1432` → `5432` (contenedor)
+- **Volumen:** `mateos_postgres-data`
+- **Ubicación física:** `/var/lib/docker/volumes/mateos_postgres-data/_data`
+
+**Conexión desde host:**
+```bash
+docker exec -i transcripcion-postgres psql -U asistente -d asistente_db
+```
+
+### Diagrama de Estructura de Base de Datos
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        ASISTENTE_DB                                  │
+│                    (PostgreSQL 15.5)                                 │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ 1. CAPTURA DE NOTAS DE VOZ                                          │
+├─────────────────────────────────────────────────────────────────────┤
+│  transcripciones (legacy)                                           │
+│  notas_audio (con IA)                                               │
+│    └─→ tipos: tarea|registro|idea|compromiso|sin_clasificar        │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ 2. JERARQUÍA DE PROYECTOS Y TAREAS                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  proyectos_estrategicos (id, nombre, estado, scores)               │
+│         │                                                            │
+│         ├─→ tareas_estrategicas (proyecto_id, estado_kanban)       │
+│         │        │                                                   │
+│         │        └─→ subtareas_estrategicas (tarea_estrategica_id) │
+│         │                  │                                         │
+│         │                  └─→ proyecto_nombre (denormalizado)      │
+│         │                                                            │
+│         └─→ ideas_capturadas (proyecto_estrategico_id)             │
+│                                                                      │
+│  tareas (legacy V1, sin proyecto)                                   │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ 3. TABLAS TAXATIVAS (Referencia)                                    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  areas_vida ──┐                                                     │
+│  motivos_personales ──┐                                             │
+│  destrezas ──┐        │                                             │
+│  dificultades ──┐     │                                             │
+│  misiones_vida ──┐    │                                             │
+│                  │    │                                             │
+│                  └────┴─→ proyectos_estrategicos                    │
+│                             (arrays de IDs)                         │
+│                                                                      │
+│  destrezas ──→ subtareas_estrategicas                               │
+│                  (destreza_principal_id)                            │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ 4. COMPROMISOS (Crítico para Marca Personal)                        │
+├─────────────────────────────────────────────────────────────────────┤
+│  compromisos                                                         │
+│    └─→ yo_me_comprometi (boolean) - CRÍTICO                        │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ 5. OTROS                                                             │
+├─────────────────────────────────────────────────────────────────────┤
+│  registros (actividades pasadas)                                    │
+│  logs_generacion_ia (auditoría de IA)                               │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ RELACIONES CLAVE                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  proyectos_estrategicos (1) ──→ (N) tareas_estrategicas            │
+│  tareas_estrategicas (1) ──→ (N) subtareas_estrategicas            │
+│  destrezas (1) ──→ (N) subtareas_estrategicas                      │
+│  proyectos_estrategicos (1) ──→ (N) ideas_capturadas               │
+│  proyectos_estrategicos (1) ──→ (N) logs_generacion_ia             │
+│                                                                      │
+│  DENORMALIZACIÓN:                                                    │
+│  subtareas_estrategicas.proyecto_nombre ← proyectos.nombre          │
+│    (Auto-actualizado via triggers)                                  │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ### Tablas Principales
 
@@ -413,10 +509,28 @@ duracion_sesion_foco_minutos: 90   -- Pomodoro extendido
 - **Campos:** `telegram_file_id`, `telegram_user_id`, `telegram_message_id`
 
 ### Google Calendar API
-- **Propósito:** Bloqueo de chunks de tiempo
-- **Método:** Sincronización unidireccional (Mateos → GCal)
+- **Propósito:** Sincronización bidireccional de eventos y análisis de disponibilidad real
+- **Método:** Sincronización bidireccional (Mateos ↔ GCal)
+- **Autenticación:** Service Account (`mateos@lifeos-463317.iam.gserviceaccount.com`)
+- **Credenciales:** `/home/azureuser/mateos/secrets/google-calendar-service-account.json` (600 permisos)
+- **Calendarios integrados:**
+  - **trunches** (`c_0c44e02...@group.calendar.google.com`): Bloques de tiempo por área de vida (capacidad disponible)
+  - **guillermo@involucrate.uy**: Citas, reuniones, tareas reales (eventos confirmados)
+- **Scripts:**
+  - `/automatizaciones/src/google-calendar-test.js`: Verificación de conexión
+  - `/automatizaciones/src/calendar-sync.js`: Sincronización bidireccional y análisis
+- **Funcionalidades:**
+  - Leer bloques de trunches (capacidad por área)
+  - Leer eventos del calendario personal (compromisos)
+  - Calcular disponibilidad real (capacidad - compromisos)
+  - Crear eventos desde Mateos en Calendar
+  - Generar reportes de disponibilidad
 - **Campo sync:** `google_calendar_event_id` en `bloques_tiempo_planificados`
 - **Colores:** Configurables en `configuracion_personal` (trabajo=9, personal=7, habitos=2)
+- **Comandos útiles:**
+  - `node src/calendar-sync.js report` - Reporte de disponibilidad (7 días)
+  - `node src/calendar-sync.js sync` - Sincronizar bloques planificados
+  - `node src/calendar-sync.js availability` - JSON de disponibilidad
 
 ### Obsidian
 - **Propósito:** Segundo cerebro, planificación semanal, contexto vivo
@@ -457,7 +571,7 @@ R2_SECRET_ACCESS_KEY="..."
 
 ---
 
-## 🚦 Estado Actual (2025-12-24)
+## 🚦 Estado Actual (2026-01-03)
 
 ### ✅ Implementado
 - [x] Captura de notas de voz vía Telegram
@@ -472,12 +586,15 @@ R2_SECRET_ACCESS_KEY="..."
 - [x] **Detección de sobrecarga** (2025-12-24)
 - [x] Priorización por score compuesto
 - [x] UI mejorada con dark mode (feature/ui-improvements)
+- [x] **Integración completa bidireccional con Google Calendar API** (2026-01-03)
+- [x] **Scripts de sincronización automática con Calendar** (2026-01-03)
+- [x] **Análisis de disponibilidad real cruzando múltiples calendarios** (2026-01-03)
 
 ### 🚧 En Desarrollo
-- [ ] Integración completa bidireccional con Google Calendar (API)
 - [ ] Dashboard visual de métricas en Next.js
 - [ ] Generación automática de archivos Obsidian
 - [ ] Notificaciones automáticas de compromisos
+- [ ] API endpoints para sincronización automática con Calendar
 
 ### 📋 Roadmap Próximo
 - [ ] Análisis predictivo de carga de trabajo

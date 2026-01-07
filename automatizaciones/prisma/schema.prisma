@@ -263,10 +263,12 @@ model TareaEstrategica {
   eisenhower                   TipoEisenhower?        @map("eisenhower")
   fechaInicio                  DateTime?              @map("fecha_inicio") @db.Date
   fechaFin                     DateTime?              @map("fecha_fin") @db.Date
+  deadLine                     DateTime?              @map("dead_line") @db.Date
   createdAt                    DateTime               @default(now()) @map("created_at")
   updatedAt                    DateTime               @updatedAt @map("updated_at")
   subtareasEstrategicas        SubtareaEstrategica[]
 
+  @@index([deadLine])
   @@map("tareas_estrategicas")
 }
 
@@ -283,11 +285,39 @@ model SubtareaEstrategica {
   destrezaPrincipal     Destrezas?          @relation(fields: [destrezaPrincipalId], references: [id])
   fechaInicio           DateTime?           @map("fecha_inicio") @db.Date
   fechaFin              DateTime?           @map("fecha_fin") @db.Date
+  deadLine              DateTime?           @map("dead_line") @db.Date
   createdAt             DateTime            @default(now()) @map("created_at")
   updatedAt             DateTime            @updatedAt @map("updated_at")
 
+  itemsEstrategicos     ItemEstrategico[]
+
+  @@index([deadLine])
   @@map("subtareas_estrategicas")
 }
+
+model ItemEstrategico {
+  id                    Int                 @id @default(autoincrement())
+  subtareaEstrategicaId Int                 @map("subtarea_estrategica_id")
+  subtareaEstrategica   SubtareaEstrategica @relation(fields: [subtareaEstrategicaId], references: [id], onDelete: Cascade)
+  nombre                String              @db.VarChar(255)
+  done                  Boolean             @default(false)
+  fechaDone             DateTime?           @map("fecha_done") @db.Timestamp
+  tiempoEstimadoMinutos Int?                @map("tiempo_estimado_minutos")
+  moscow                TipoMoscow?
+  fechaInicio           DateTime?           @map("fecha_inicio") @db.Date
+  fechaFin              DateTime?           @map("fecha_fin") @db.Date
+  deadLine              DateTime?           @map("dead_line") @db.Date
+  proyectoNombre        String?             @map("proyecto_nombre") @db.VarChar(200)
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+
+  @@index([subtareaEstrategicaId])
+  @@index([done])
+  @@index([deadLine])
+  @@index([proyectoNombre])
+  @@map("items_estrategicos")
+}
+
 
 model LogGeneracionIA {
   id             Int       @id @default(autoincrement())

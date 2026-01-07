@@ -14,6 +14,136 @@ Esta bitácora registra cambios arquitectónicos globales, actualizaciones de in
 
 ---
 
+## 2026
+
+### Enero
+
+## 2026-01-03 10:00 | [database] [google-calendar] | [claude-code]
+
+**Implementación completa del sistema de tareas recurrentes y integración con Google Calendar**
+
+#### Base de Datos: Migraciones del Sistema de Tareas Recurrentes
+- **[Migración 01]:** Tablas de tareas recurrentes
+  - Creada tabla `tareas_recurrentes` (patrón de recurrencia en JSONB)
+  - Creada tabla `instancias_tareas_recurrentes` (instancias generadas)
+  - Creada tabla `disponibilidad_semanal` (horas productivas por día)
+  - Índices optimizados para búsquedas por fecha y estado
+  - Triggers para auto-actualización de `updated_at`
+
+- **[Migración 02]:** Vistas de disponibilidad y carga semanal
+  - Vista `disponibilidad_real_semanal`: Cálculo de horas disponibles por día
+  - Vista `carga_semanal_recurrentes`: Tiempo ocupado por recurrentes
+  - Vista `instancias_proxima_semana`: Instancias próximas a ejecutar
+  - Vista `tareas_recurrentes_resumen`: Resumen por área de vida
+
+- **[Migración 03]:** Modificaciones a tareas estratégicas
+  - Agregados campos: `energia_requerida`, `contexto_necesario`, `duracion_real_horas`
+  - Agregados campos de bloqueo: `bloqueada_por`, `fecha_estimada_desbloqueo`
+  - Creada tabla `bloques_tiempo_planificados` (chunks para Google Calendar)
+  - Índices para optimizar consultas de planificación
+
+- **[Migración 04]:** Sistema de configuración personal
+  - Creada tabla `configuracion_personal` (valores en JSONB)
+  - Insertadas 29 configuraciones por defecto (TDAH-optimizado)
+  - Funciones creadas: `get_config()`, `get_config_numero()`, `get_config_texto()`, `get_config_bool()`
+  - Función `mateos_set_config()` para actualización de configuraciones
+
+- **[Queries Útiles]:** Vistas de análisis y priorización
+  - Vista `tareas_sugeridas_hoy`: Tareas priorizadas por score compuesto
+  - Vista `vista_que_hacer_ahora`: Top 10 subtareas priorizadas
+  - Vista `tareas_bloqueadas_atencion`: Tareas bloqueadas que requieren seguimiento
+  - Vista `compromisos_proximos`: Compromisos ordenados por urgencia (crítico para marca personal)
+  - Vista `planificacion_semana_completa`: Consolidado de recurrentes + bloques planificados
+  - Vista `metricas_tareas_recurrentes`: Tasa de completitud últimos 30 días
+  - Vista `precision_estimaciones`: Análisis de estimaciones vs realidad
+  - Vista `tiempo_por_area_semana`: Distribución de tiempo por área
+  - Vista `distribucion_porcentual_areas`: Porcentaje de tiempo por área
+  - Vista `vista_sobrecarga_semanal`: Detección de sobrecarga con indicadores visuales
+
+- **[Resultado]:** Sistema completo de gestión de tiempo con:
+  - 5 tablas nuevas
+  - 19 vistas de análisis
+  - 29 configuraciones instaladas
+  - Detección automática de sobrecarga
+  - Priorización inteligente con score compuesto
+
+#### Google Calendar API: Integración Completa
+- **[Service Account]:** Configurado en Google Cloud Platform
+  - Proyecto: `lifeos-463317`
+  - Service Account: `mateos@lifeos-463317.iam.gserviceaccount.com`
+  - Credenciales almacenadas en: `/home/azureuser/mateos/secrets/google-calendar-service-account.json`
+  - Permisos: 600 (solo azureuser)
+
+- **[Calendarios Integrados]:**
+  - **trunches** (`c_0c44e02...@group.calendar.google.com`): Bloques de tiempo por área de vida (capacidad disponible)
+    - Compartido con service account con permisos de escritura
+    - Eventos: dormir, meditación, trabajo, baño, revisión de día
+  - **guillermo@involucrate.uy**: Citas, reuniones, tareas reales (eventos confirmados)
+    - Compartido con service account con permisos de escritura
+    - Uso: eventos confirmados y compromisos reales
+
+- **[Librería Instalada]:** `googleapis` (Node.js)
+  - Instalado en `/home/azureuser/mateos/automatizaciones/node_modules`
+  - Versión compatible con autenticación de Service Account
+
+- **[Scripts Creados]:**
+  1. **`/automatizaciones/src/google-calendar-test.js`**:
+     - Verificación de conexión con ambos calendarios
+     - Lectura de eventos próximos 7 días
+     - Diagnóstico de permisos y errores
+     - Uso: `node src/google-calendar-test.js`
+
+  2. **`/automatizaciones/src/calendar-sync.js`**:
+     - Sincronización bidireccional completa
+     - Funciones principales:
+       - `getTrunchesBlocks()`: Lee bloques de capacidad del calendario trunches
+       - `getPersonalEvents()`: Lee eventos confirmados del calendario personal
+       - `calculateAvailability()`: Calcula disponibilidad real (capacidad - compromisos)
+       - `createPersonalEvent()`: Crea eventos en calendar desde Mateos
+       - `syncPlannedBlocksToCalendar()`: Sincroniza bloques planificados de BD a Calendar
+       - `printAvailabilityReport()`: Genera reporte de disponibilidad por día
+     - Comandos CLI:
+       - `node src/calendar-sync.js report [días]` - Reporte de disponibilidad
+       - `node src/calendar-sync.js sync` - Sincronizar bloques planificados
+       - `node src/calendar-sync.js availability` - JSON de disponibilidad
+
+- **[Configuración en BD]:**
+  - Calendar ID trunches guardado en `configuracion_personal`
+  - Calendar ID personal guardado en `configuracion_personal`
+  - Colores configurados para diferentes tipos de bloques
+
+- **[Capacidades Implementadas]:**
+  - ✅ Leer bloques de trunches (capacidad por área)
+  - ✅ Leer eventos del calendario personal (compromisos)
+  - ✅ Calcular disponibilidad real cruzando ambos calendarios
+  - ✅ Crear eventos desde Mateos en Google Calendar
+  - ✅ Generar reportes de disponibilidad por día
+  - ✅ Detectar sobrecarga de tiempo
+  - ⏳ Sincronización automática con cron (próximo paso)
+
+#### Documentación Actualizada
+- **[_CONTEXT.md]:** Actualizada sección de Google Calendar API
+  - Documentados calendarios integrados
+  - Documentados scripts y comandos
+  - Actualizado estado del proyecto (integración completa)
+- **[GOOGLE_CALENDAR_SETUP.md]:** Creada guía paso a paso para configuración
+  - Instrucciones completas para crear Service Account
+  - Pasos para compartir calendarios
+  - Troubleshooting común
+- **[secrets/README.md]:** Creado README en directorio de secrets
+  - Documentación de archivos de credenciales
+  - Instrucciones de permisos
+
+#### Próximos Pasos
+1. Configurar disponibilidad semanal real del usuario
+2. Crear tareas recurrentes de ejemplo
+3. Crear proyectos y tareas estratégicas
+4. Implementar API endpoints en Next.js para sincronización automática
+5. Configurar cron job para sincronización periódica
+6. Implementar dashboard visual de métricas
+
+---
+
 ## 2025
 
 ### Diciembre

@@ -8,7 +8,6 @@ interface Subtarea {
   id: number;
   titulo: string;
   completada: boolean;
-  // Add other fields as needed
 }
 
 interface TareaEstrategica {
@@ -18,7 +17,6 @@ interface TareaEstrategica {
   estado: string;
   moscow?: 'must' | 'should' | 'could' | 'wont';
   subtareas: Subtarea[];
-  // Add other fields as needed
 }
 
 interface ProyectoEstrategico {
@@ -26,14 +24,26 @@ interface ProyectoEstrategico {
   nombre: string;
   descripcion?: string;
   estado: string;
-  prioridadGlobal?: number;
-  scoreMotivacional?: number;
-  scoreAlineacion?: number;
-  justificacionEstrategica?: any; // JSONB
-  objetivosSmart?: any; // JSONB
+  prioridadGlobal?: number | string | null;
+  scoreMotivacional?: number | string | null;
+  scoreAlineacion?: number | string | null;
+  justificacionEstrategica?: any;
+  objetivosSmart?: any;
   tareasEstrategicas: TareaEstrategica[];
-  // Add other fields as needed
 }
+
+const formatDecimal = (value: number | string | null | undefined): string => {
+  if (value === null || value === undefined) {
+    return '—';
+  }
+
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return '—';
+  }
+
+  return numericValue.toFixed(2);
+};
 
 export default function ProjectDetailsPage() {
   const { id } = useParams();
@@ -73,14 +83,13 @@ export default function ProjectDetailsPage() {
       if (!response.ok) {
         throw new Error('Failed to delete project');
       }
-      router.push('/proyectos'); // Redirect to projects list after deletion
+      router.push('/proyectos');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
       setLoading(false);
     }
   };
-
 
   if (loading) return <div className="p-6">Cargando detalles del proyecto...</div>;
   if (error) return <div className="p-6 text-red-500">Error: {error}</div>;
@@ -92,10 +101,6 @@ export default function ProjectDetailsPage() {
       <p className="text-gray-600 dark:text-gray-400 mb-6">{proyecto.descripcion}</p>
 
       <div className="flex space-x-4 mb-6">
-        {/* Link to an edit page if needed */}
-        {/* <Link href={`/proyectos/${proyecto.id}/edit`} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-          Editar Proyecto
-        </Link> */}
         <button onClick={handleDelete} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded">
           Eliminar Proyecto
         </button>
@@ -108,11 +113,11 @@ export default function ProjectDetailsPage() {
         </div>
         <div className="bg-white p-6 rounded-lg shadow-md dark:bg-gray-800 dark:text-gray-200">
           <h2 className="text-xl font-semibold mb-2">Prioridad Global</h2>
-          <p>{proyecto.prioridadGlobal?.toFixed(2)}</p>
+          <p>{formatDecimal(proyecto.prioridadGlobal)}</p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow-md dark:bg-gray-800 dark:text-gray-200">
           <h2 className="text-xl font-semibold mb-2">Alineación</h2>
-          <p>{proyecto.scoreAlineacion?.toFixed(2)}</p>
+          <p>{formatDecimal(proyecto.scoreAlineacion)}</p>
         </div>
       </div>
 

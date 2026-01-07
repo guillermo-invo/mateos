@@ -32,6 +32,18 @@ const estadoConfig: Record<EstadoProyecto, { color: any; label: string }> = {
   archivado: { color: 'default', label: 'Archivado' },
 };
 
+// Helper function to safely format numbers with .toFixed()
+const safeToFixed = (value: unknown, decimals: number = 1): string => {
+  if (value === null || value === undefined) {
+    return '0.0';
+  }
+  const numValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numValue)) {
+    return '0.0';
+  }
+  return numValue.toFixed(decimals);
+};
+
 export default function ProyectoCard({
   id,
   nombre,
@@ -75,14 +87,14 @@ export default function ProyectoCard({
         {/* Información de Tiempo */}
         <div className="text-sm text-gray-600 dark:text-gray-400">
           <span className="font-medium">
-            {horasCompletadas.toFixed(1)}h
+            {safeToFixed(horasCompletadas, 1)}h
           </span>
           {' / '}
           <span className="font-medium">
-            {horasTotal.toFixed(1)}h
+            {safeToFixed(horasTotal, 1)}h
           </span>
           <span className="text-gray-500 dark:text-gray-500 ml-2">
-            ({horasRestantes.toFixed(1)}h restantes)
+            ({safeToFixed(horasRestantes, 1)}h restantes)
           </span>
         </div>
       </CardBody>

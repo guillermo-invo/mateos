@@ -5,19 +5,30 @@ const AUTOMATIZACIONES_SERVICE_URL = process.env.AUTOMATIZACIONES_SERVICE_URL ||
 
 export async function POST(request: Request) {
   try {
-    const { descripcion, documentosUrls, ideaId } = await request.json();
+    const body = await request.json();
+    const { nombre, descripcion, areasIds, motivosIds, nuevaAreaVida, nuevoMotivoPersonal, documentosUrls, ideaId } = body;
 
     if (!descripcion) {
       return NextResponse.json({ success: false, error: 'Description is required for project generation' }, { status: 400 });
     }
 
     // Call the automatizaciones service to generate and save the project
+    // Pass all user input data to automatizaciones
     const response = await fetch(`${AUTOMATIZACIONES_SERVICE_URL}/generar-proyecto`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ descripcion, documentosUrls, ideaId }), // Pass ideaId to automatizaciones service
+      body: JSON.stringify({
+        nombre,
+        descripcion,
+        areasIds,
+        motivosIds,
+        nuevaAreaVida,
+        nuevoMotivoPersonal,
+        documentosUrls,
+        ideaId,
+      }),
     });
 
     if (!response.ok) {

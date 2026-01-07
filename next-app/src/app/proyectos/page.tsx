@@ -48,6 +48,18 @@ const estadoLabels: Record<string, string> = {
   archivado: 'Archivado',
 };
 
+// Helper function to safely format numbers with .toFixed()
+const safeToFixed = (value: unknown, decimals: number = 1): string => {
+  if (value === null || value === undefined) {
+    return '0.0';
+  }
+  const numValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numValue)) {
+    return '0.0';
+  }
+  return numValue.toFixed(decimals);
+};
+
 export default function ProyectosPage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -194,13 +206,13 @@ export default function ProyectosPage() {
                               Progreso
                             </span>
                             <span className="text-sm font-medium text-gray-900 dark:text-white">
-                              {proyecto.progreso.toFixed(1)}%
+                              {safeToFixed(proyecto.progreso, 1)}%
                             </span>
                           </div>
                           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                             <div
                               className="bg-blue-500 h-2 rounded-full transition-all"
-                              style={{ width: `${Math.min(proyecto.progreso, 100)}%` }}
+                              style={{ width: `${Math.min(Number(proyecto.progreso) || 0, 100)}%` }}
                             />
                           </div>
                         </div>
@@ -208,14 +220,14 @@ export default function ProyectosPage() {
                         {/* Time information */}
                         <div className="text-sm text-gray-600 dark:text-gray-400">
                           <span className="font-medium text-gray-900 dark:text-white">
-                            {proyecto.horasCompletadas.toFixed(1)}h
+                            {safeToFixed(proyecto.horasCompletadas, 1)}h
                           </span>
                           {' / '}
                           <span className="font-medium text-gray-900 dark:text-white">
-                            {proyecto.horasTotal.toFixed(1)}h
+                            {safeToFixed(proyecto.horasTotal, 1)}h
                           </span>
                           <span className="text-gray-500 dark:text-gray-500 ml-2">
-                            ({proyecto.horasRestantes.toFixed(1)}h restantes)
+                            ({safeToFixed(proyecto.horasRestantes, 1)}h restantes)
                           </span>
                         </div>
 

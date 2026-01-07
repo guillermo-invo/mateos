@@ -51,6 +51,7 @@ services:
       R2_BUCKET_NAME: ${R2_BUCKET_NAME}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      AUTOMATIZACIONES_SERVICE_URL: http://automatizaciones:3100
       WEBHOOK_AUTOMATIZACIONES_URL: http://automatizaciones:3100/webhook
       WEBHOOK_AUTOMATIZACIONES_PROYECTO_URL: http://automatizaciones:3100/webhook/proyecto
     healthcheck:
