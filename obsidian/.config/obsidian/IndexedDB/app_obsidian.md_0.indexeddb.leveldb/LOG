@@ -38,3 +38,8 @@
 2026/01/06-11:40:46.772 196 Level-0 table #29: started
 2026/01/06-11:40:46.879 196 Level-0 table #29: 1360301 bytes OK
 2026/01/06-11:40:46.885 196 Delete type=0 #24
+2026/01/07-14:52:33.359 196 Compacting 1@1 + 2@2 files
+2026/01/07-14:52:33.506 196 Generated table #30@1: 5428 keys, 2144722 bytes
+2026/01/07-14:52:33.560 196 Generated table #31@1: 1185 keys, 723298 bytes
+2026/01/07-14:52:33.560 196 Compacted 1@1 + 2@2 files => 2868020 bytes
+2026/01/07-14:52:33.564 196 compacted to: files[ 0 0 2 0 0 0 0 ]

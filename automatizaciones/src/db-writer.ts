@@ -138,12 +138,31 @@ export async function saveExtraction(notaAudioId: number, extraccion: Extraccion
 
       case 'idea':
         if (extraccion.idea) {
+          // Buscar areaVidaId por nombre
+          let areaVidaId: number | null = null;
+          if (extraccion.idea.area_vida_nombre) {
+            const area = await prisma.areasVida.findFirst({
+              where: {
+                nombre: {
+                  equals: extraccion.idea.area_vida_nombre,
+                  mode: 'insensitive' // Case-insensitive
+                }
+              }
+            });
+            areaVidaId = area?.id || null;
+            
+            if (!area) {
+              console.log(`⚠️ Área de vida "${extraccion.idea.area_vida_nombre}" no encontrada en BD`);
+            }
+          }
+
           await prisma.ideaCapturada.create({
             data: {
               notaAudioId,
               titulo: extraccion.idea.titulo,
               descripcion: extraccion.idea.descripcion || null,
               categoria: extraccion.idea.categoria || null,
+              areaVidaId: areaVidaId,
               implementada: false,
             },
           });

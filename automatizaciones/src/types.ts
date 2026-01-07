@@ -53,6 +53,7 @@ export interface IdeaExtraida {
   titulo: string;
   descripcion?: string;
   categoria?: string;
+  area_vida_nombre?: string; // Nombre del área de vida
 }
 
 export interface ExtraccionIA {

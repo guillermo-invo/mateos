@@ -141,6 +141,8 @@ model IdeaCapturada {
   proyectoEstrategicoId Int?                 @map("proyecto_estrategico_id")
   proyectoEstrategico   ProyectoEstrategico? @relation(fields: [proyectoEstrategicoId], references: [id])
 
+  areaVidaId          Int?
+  areaVida            AreasVida? @relation(fields: [areaVidaId], references: [id], onDelete: SetNull)
 
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
@@ -148,6 +150,7 @@ model IdeaCapturada {
   @@index([notaAudioId])
   @@index([implementada])
   @@index([categoria])
+  @@index([areaVidaId])
   @@map("ideas_capturadas")
 }
 
@@ -168,6 +171,7 @@ model AreasVida {
 
   // Relaciones
   registros           Registro[]
+  ideas               IdeaCapturada[]
 
   @@map("areas_vida")
 }

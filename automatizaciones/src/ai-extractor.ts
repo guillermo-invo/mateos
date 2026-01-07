@@ -118,7 +118,10 @@ Extrae los siguientes campos en formato JSON:
 Responde SOLO con el JSON, sin texto adicional.
 `.trim(),
 
-  idea: (texto: string) => `
+  idea: async (texto: string) => {
+    const areas = await getAreasVida();
+    
+    return `
 Extrae de esta nota una IDEA o pensamiento.
 
 Transcripción: "${texto}"
@@ -127,11 +130,17 @@ Extrae los siguientes campos en formato JSON:
 {
   "titulo": "string (resumen en 5-10 palabras)",
   "descripcion": "string (detalle completo)",
-  "categoria": "string (tipo de idea: 'producto', 'mejora', 'estrategia', 'contenido', 'otro', etc.)"
+  "categoria": "string (tipo de idea: 'producto', 'mejora', 'estrategia', 'contenido', 'otro', etc.)",
+  "area_vida_nombre": "string (IMPORTANTE: Clasifica la idea en UNA de estas áreas: [${areas.join(', ')}]. Elige la más apropiada según el contexto)"
 }
 
+REGLAS IMPORTANTES:
+- area_vida_nombre: DEBE ser exactamente uno de los nombres de la lista de áreas
+- Si hay duda, usar 'Mateos' como área por defecto
+
 Responde SOLO con el JSON, sin texto adicional.
-`.trim(),
+`.trim();
+  },
 
   proyecto: (texto: string) => `
 Extrae de esta nota una IDEA DE PROYECTO.
