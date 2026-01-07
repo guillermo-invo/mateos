@@ -1,23 +1,23 @@
 {
   "transcription": {
     "provider": "openai",
-    "model": "whisper-v4",
-    "description": "Transcripción de alta fidelidad optimizada para 2026."
+    "model": "whisper-1",
+    "description": "Transcripción con Whisper estándar de OpenAI."
   },
   "extraction": {
-    "model": "gpt-5.1-mini",
+    "model": "gpt-4o-mini",
     "temperature": 0,
     "maxTokens": 4000,
     "description": "Extracción estructurada (JSON Mode) con latencia mínima."
   },
   "projectCreation": {
-    "model": "gpt-5.1",
+    "model": "gpt-4o",
     "temperature": 0.8,
     "maxTokens": 16000,
     "description": "Generación creativa y razonamiento complejo."
   },
   "dailySummary": {
-    "model": "gpt-5-mini",
+    "model": "gpt-4o-mini",
     "temperature": 0.3,
     "maxTokens": 2000,
     "description": "Resumen ejecutivo optimizado para tokens."
