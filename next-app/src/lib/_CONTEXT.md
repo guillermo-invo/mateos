@@ -234,6 +234,62 @@ const completion = await openai.chat.completions.create({
 
 ---
 
+### serializePrisma.ts (Serialización de Datos Prisma)
+
+**Propósito:** Convertir tipos especiales de Prisma (Decimal, Date, BigInt) a tipos serializables en JSON.
+
+**Problema:** Prisma devuelve `Decimal` como objetos que se serializan a strings en JSON.
+
+**Solución:**
+```typescript
+import { Prisma } from '@prisma/client'
+
+function convertPrismaValue(value: unknown): unknown {
+  if (value === null || value === undefined) return value
+  
+  if (typeof value === 'bigint') return Number(value)
+  
+  if (value instanceof Prisma.Decimal) return value.toNumber()
+  
+  if (value instanceof Date) return value
+  
+  if (Array.isArray(value)) {
+    return value.map(item => convertPrismaValue(item))
+  }
+  
+  if (typeof value === 'object') {
+    const converted: Record<string, unknown> = {}
+    for (const [key, val] of Object.entries(value)) {
+      converted[key] = convertPrismaValue(val)
+    }
+    return converted
+  }
+  
+  return value
+}
+
+export function serializePrismaData<T>(data: T): T {
+  return convertPrismaValue(data) as T
+}
+```
+
+**Uso:**
+```typescript
+import { serializePrismaData } from '@/lib/serializePrisma'
+
+const proyecto = await prisma.proyectoEstrategico.findUnique({ where: { id } })
+const serialized = serializePrismaData(proyecto)
+
+return NextResponse.json({ success: true, data: serialized })
+```
+
+**⚠️ IMPORTANTE:**
+- Usar en API routes ANTES de `NextResponse.json()`
+- Convierte Decimals a números, no a strings
+- Maneja objetos anidados y arrays recursivamente
+
+---
+
 ### automatizaciones-webhook.ts (Cliente Webhook Automatizaciones)
 
 **Propósito:** Cliente para notificar eventos al microservicio de automatizaciones.
@@ -382,5 +438,27 @@ await page.route('**/openai.com/**', route => {
 
 ---
 
-**Última actualización:** 2025-12-26
-**Versión:** 1.0
+## CAMBIOS RECIENTES
+
+### 2026-01-07: Serialización de Decimals
+
+**Agregado:**
+- `serializePrisma.ts`: Helper para convertir Decimals a números
+- Soluciona problema de campos `scoreMotivacional`, `scoreAlineacion` devueltos como strings
+
+**Uso en API routes:**
+```typescript
+import { serializePrismaData } from '@/lib/serializePrisma'
+
+const proyecto = await prisma.proyectoEstrategico.findUnique({...})
+return NextResponse.json({
+  success: true,
+  data: serializePrismaData(proyecto)
+})
+```
+
+---
+
+**Última actualización:** 2026-01-07
+**Cambios:** Agregado serializePrisma helper
+**Versión:** 1.1
