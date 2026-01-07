@@ -189,11 +189,9 @@ function CrearProyectoContent() {
         {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4 dark:bg-red-900 dark:text-red-300">{error}</div>}
         {success && (
           <div className="bg-green-100 text-green-700 p-3 rounded mb-4 dark:bg-green-900 dark:text-green-300">
-            ¡Proyecto creado exitosamente! El backend está poblando todas las tablas.
+            ¡Proyecto &quot;{success.nombre}&quot; creado exitosamente (ID: {success.id})!
             <br />
-            <a href={`/proyectos/${success.id}`} className="underline font-semibold mt-2 inline-block">
-              Ver proyecto: {success.nombre}
-            </a>
+            <span className="text-sm">El backend ha generado todas las tareas, subtareas y relaciones estratégicas.</span>
           </div>
         )}
 

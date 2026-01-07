@@ -22,8 +22,17 @@ const serializeProyectoResponse = <T extends Record<string, unknown>>(data: T): 
   const serialized = serializePrismaData(data) as Record<string, unknown>;
   const normalized = { ...serialized };
 
+  // Convert decimal fields (which may be strings, Decimals, or null) to numbers
   decimalFields.forEach((field: DecimalField) => {
-    normalized[field] = toNumberOrNull(normalized[field]);
+    const value = normalized[field];
+    if (value !== null && value !== undefined) {
+      // Handle both Prisma Decimal objects and string representations
+      const stringValue = typeof value === 'string' ? value : String(value);
+      const numValue = parseFloat(stringValue);
+      normalized[field] = Number.isFinite(numValue) ? numValue : null;
+    } else {
+      normalized[field] = null;
+    }
   });
 
   return normalized as T;
