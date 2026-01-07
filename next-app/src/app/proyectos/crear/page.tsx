@@ -21,6 +21,7 @@ function CrearProyectoContent() {
   const [descripcion, setDescripcion] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{ id: number; nombre: string } | null>(null);
   const [selectedIdeaId, setSelectedIdeaId] = useState<number | null>(null);
   const [projectIdeas, setProjectIdeas] = useState<ProjectIdea[]>([]);
 
@@ -93,6 +94,7 @@ function CrearProyectoContent() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
 
     try {
       // Always use AI generation endpoint
@@ -137,7 +139,29 @@ function CrearProyectoContent() {
       }
 
       const result = await response.json();
-      router.push(`/proyectos/${result.data.id || result.data}`);
+      const projectId = result.data.id || result.data;
+      const projectName = nombre || 'Proyecto sin nombre';
+      
+      // Show success message and stay on the page
+      setSuccess({ id: projectId, nombre: projectName });
+      
+      // Reset form
+      setNombre('');
+      setDescripcion('');
+      setSelectedArea(null);
+      setSelectedMotivos([]);
+      setNuevaAreaVida('');
+      setNuevoMotivoPersonal('');
+      setSelectedIdeaId(null);
+      
+      // Refresh available ideas list
+      try {
+        const ideasRes = await fetch('/api/ideas/disponibles');
+        const ideasData = await ideasRes.json();
+        setProjectIdeas(ideasData.data || []);
+      } catch (e) {
+        console.error('Failed to refresh ideas:', e);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
@@ -163,6 +187,15 @@ function CrearProyectoContent() {
 
       <form onSubmit={handleSubmit} className="bg-white p-8 rounded-lg shadow-md dark:bg-gray-800">
         {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4 dark:bg-red-900 dark:text-red-300">{error}</div>}
+        {success && (
+          <div className="bg-green-100 text-green-700 p-3 rounded mb-4 dark:bg-green-900 dark:text-green-300">
+            ¡Proyecto creado exitosamente! El backend está poblando todas las tablas.
+            <br />
+            <a href={`/proyectos/${success.id}`} className="underline font-semibold mt-2 inline-block">
+              Ver proyecto: {success.nombre}
+            </a>
+          </div>
+        )}
 
         <div className="mb-4">
           <label htmlFor="selectIdea" className="block text-gray-700 text-sm font-bold mb-2 dark:text-gray-300">

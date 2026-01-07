@@ -64,5 +64,8 @@ export async function guardarProyectoGenerado(
     });
     
     return proyecto.id;
+  }, {
+    maxWait: 30000, // 30 segundos de espera máxima
+    timeout: 30000, // 30 segundos de timeout
   });
 }

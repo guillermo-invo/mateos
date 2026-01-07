@@ -1,104 +1,114 @@
+import OpenAI from 'openai';
+import { PrismaClient } from '@prisma/client';
 import { PROMPT_SISTEMA_PROYECTO } from './prompts-proyectos';
-import { EstructuraProyecto } from '../types'; // Assuming types are here, will confirm
+import { EstructuraProyecto } from '../types';
+import { getModelConfig } from '../model-config';
 
-// Placeholder for Anthropic client. In a real scenario, this would be an actual API client.
-// For now, it's mocked or requires a proper import and setup.
-const anthropic = {
-  messages: {
-    create: async ({ model, temperature, max_tokens, messages }: any) => {
-      // Mock response for now
-      console.log(`Mocking AI call to ${model} with messages:`, messages);
-      return {
-        content: [{ text: JSON.stringify({
-          proyecto: {
-            justificacion_estrategica: "Justificación estratégica de prueba",
-            areas_ids: [1],
-            motivos_ids: [1],
-            destrezas_requeridas_ids: [1],
-            dificultades_ids: [1],
-            misiones_ids: [1]
-          },
-          tareas: [{
-            nombre: "Tarea de prueba",
-            orden: 1,
-            moscow: "must",
-            tiempo_estimado_horas: 1,
-            nivel_riesgo: "bajo",
-            subtareas: [{ titulo: "Subtarea de prueba" }]
-          }]
-        }) }],
-        usage: { total_tokens: 100 }
-      };
-    },
-  },
-};
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-// Placeholder functions - these would interact with the database or other parts of the system
-async function obtenerContextoPersonal(): Promise<string> {
-  // Logic to fetch personal context from DB or configuration
-  return "Guillermo es un solopreneur social, interesado en impacto social y desarrollo personal.";
-}
-
-async function obtenerProyectosActivos(): Promise<string> {
-  // Logic to fetch active projects from DB
-  return "No hay proyectos activos.";
-}
-
-function buildPrompt(descripcion: string, contexto: string, proyectosActivos: string): string {
-  // Logic to construct the full prompt for the AI
-  return `Descripción del proyecto: ${descripcion}\nContexto: ${contexto}\nProyectos activos: ${proyectosActivos}`;
-}
-
-async function validarEstructura(estructura: EstructuraProyecto): Promise<void> {
-  // Logic to validate the AI-generated structure
-  console.log("Validando estructura:", estructura);
-  // Throw error if invalid
-}
-
-function calcularScoreMotivos(motivos_ids: number[]): number {
-  // Mock function, in real scenario this would call the DB function or replicate its logic
-  console.log("Calculando score de motivos para IDs:", motivos_ids);
-  return 8.5;
-}
-
-function calcularScoreAlineacion(misiones_ids: number[]): number {
-  // Mock function, in real scenario this would call the DB function or replicate its logic
-  console.log("Calculando score de alineación para IDs:", misiones_ids);
-  return 9.2;
-}
+const prisma = new PrismaClient();
 
 
 export async function generarEstructuraProyecto(
   descripcion: string,
   documentosUrls?: string[]
 ): Promise<EstructuraProyecto> {
-  // 1. Obtener contexto personal
-  const contexto = await obtenerContextoPersonal();
-  
-  // 2. Obtener proyectos activos
-  const proyectosActivos = await obtenerProyectosActivos();
-  
-  // 3. Construir prompt
-  const prompt = buildPrompt(descripcion, contexto, proyectosActivos);
-  
-  // 4. Llamar a Claude/GPT
-  const response = await anthropic.messages.create({
-    model: "claude-3-5-sonnet-20241022",
-    temperature: 0.3,
-    max_tokens: 8000,
-    messages: [
-      { role: "system", content: PROMPT_SISTEMA_PROYECTO },
-      { role: "user", content: prompt }
-    ]
-  });
-  
-  // 5. Parsear y validar
-  const estructura = JSON.parse(response.content[0].text);
-  await validarEstructura(estructura);
-  
-  // 6. Enriquecer con cálculos
-  estructura.proyecto.score_motivacional = calcularScoreMotivos(estructura.proyecto.motivos_ids);
-  estructura.proyecto.score_alineacion = calcularScoreAlineacion(estructura.proyecto.misiones_ids);
-  
-  return estructura;
+  try {
+    console.log(`🤖 Generando estructura de proyecto con IA...`);
+    console.log(`📝 Descripción: ${descripcion}`);
+
+    const modelConfig = getModelConfig('projectCreation');
+
+    // 1. Obtener contexto personal desde la BD
+    const [areas, motivos, destrezas, dificultades, misiones] = await Promise.all([
+      prisma.areasVida.findMany(),
+      prisma.motivosPersonales.findMany(),
+      prisma.destrezas.findMany(),
+      prisma.dificultades.findMany(),
+      prisma.misionesVida.findMany(),
+    ]);
+
+    const contextPersonal = {
+      areasVida: areas.map((a) => ({ id: a.id, nombre: a.nombre })),
+      motivosPersonales: motivos.map((m) => ({
+        id: m.id,
+        nombre: m.nombre,
+        descripcion: m.descripcion,
+      })),
+      destrezas: destrezas.map((d) => ({
+        id: d.id,
+        nombre: d.nombre,
+        nivel: d.nivelActual,
+      })),
+      dificultades: dificultades.map((d) => ({
+        id: d.id,
+        nombre: d.nombre,
+        descripcion: d.descripcion,
+      })),
+      misiones: misiones.map((m) => ({
+        id: m.id,
+        nombre: m.nombre,
+        descripcion: m.descripcion,
+      })),
+    };
+
+    // 2. Obtener proyectos activos
+    const proyectosActivos = await prisma.proyectoEstrategico.findMany({
+      where: {
+        estado: { in: ['planificacion', 'en_curso'] },
+      },
+      select: { id: true, nombre: true, estado: true },
+      take: 10,
+    });
+
+    // 3. Construir proyecto propuesto
+    const proyectoPropuesto = {
+      nombre: 'Nuevo Proyecto',
+      descripcion: descripcion,
+    };
+
+    // 4. Construir prompt final
+    const finalPrompt = PROMPT_SISTEMA_PROYECTO.replace(
+      /{contexto_personal}/g,
+      JSON.stringify(contextPersonal, null, 2)
+    )
+      .replace(
+        /{proyectos_activos}/g,
+        JSON.stringify(proyectosActivos, null, 2)
+      )
+      .replace(
+        /{proyecto_propuesto}/g,
+        JSON.stringify(proyectoPropuesto, null, 2)
+      );
+
+    // 5. Llamar a OpenAI
+    const response = await openai.chat.completions.create({
+      model: modelConfig.model,
+      messages: [
+        {
+          role: 'system',
+          content: finalPrompt,
+        },
+      ],
+      temperature: modelConfig.temperature ?? 0.7,
+      max_completion_tokens: modelConfig.maxTokens ?? 8000,
+      response_format: { type: 'json_object' },
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error('OpenAI no devolvió contenido');
+    }
+
+    // 6. Parsear respuesta
+    const estructura = JSON.parse(content) as EstructuraProyecto;
+
+    console.log('✅ Estructura de proyecto generada');
+    return estructura;
+  } catch (error) {
+    console.error('❌ Error generando estructura de proyecto:', error);
+    throw error;
+  }
 }
