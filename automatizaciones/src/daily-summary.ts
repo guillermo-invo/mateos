@@ -15,9 +15,9 @@ export interface DailySummaryData {
     id: number;
     descripcion: string;
     duracionHoras: number | null;
-    proyecto: string | null;
+    proyectoNombre: string | null;
     personasInvolucradas: string[];
-    categoria: string;
+    areaVidaId: number | null;
   }>;
   tareas: Array<{
     id: number;
@@ -138,7 +138,7 @@ export function generateSimpleSummary(data: DailySummaryData): string {
 
     data.registros.forEach((reg, idx) => {
       const duracion = reg.duracionHoras ? ` (${reg.duracionHoras}h)` : '';
-      const proyecto = reg.proyecto ? ` - ${reg.proyecto}` : '';
+      const proyecto = reg.proyectoNombre ? ` - ${reg.proyectoNombre}` : '';
       const personas = reg.personasInvolucradas.length > 0
         ? ` con ${reg.personasInvolucradas.join(', ')}`
         : '';

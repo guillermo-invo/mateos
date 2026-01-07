@@ -1,4 +1,4 @@
-import { PrismaClient, Prioridad, Categoria } from '@prisma/client';
+import { PrismaClient, Prioridad } from '@prisma/client';
 import { ExtraccionIA, DetectionResult } from './types';
 
 const prisma = new PrismaClient();
@@ -82,14 +82,32 @@ export async function saveExtraction(notaAudioId: number, extraccion: Extraccion
 
       case 'registro':
         if (extraccion.registro) {
+          // Buscar areaVidaId por nombre
+          let areaVidaId: number | null = null;
+          if (extraccion.registro.area_vida_nombre) {
+            const area = await prisma.areasVida.findFirst({
+              where: {
+                nombre: {
+                  equals: extraccion.registro.area_vida_nombre,
+                  mode: 'insensitive' // Case-insensitive
+                }
+              }
+            });
+            areaVidaId = area?.id || null;
+            
+            if (!area) {
+              console.log(`⚠️ Área de vida "${extraccion.registro.area_vida_nombre}" no encontrada en BD`);
+            }
+          }
+
           await prisma.registro.create({
             data: {
               notaAudioId,
               descripcion: extraccion.registro.descripcion,
               duracionHoras: extraccion.registro.duracion_horas || null,
-              proyecto: extraccion.registro.proyecto || null,
+              proyectoNombre: extraccion.registro.proyecto_nombre || 'otros',
               personasInvolucradas: extraccion.registro.personas_involucradas || [],
-              categoria: extraccion.registro.categoria as Categoria,
+              areaVidaId: areaVidaId,
               fechaActividad: new Date(),
             },
           });

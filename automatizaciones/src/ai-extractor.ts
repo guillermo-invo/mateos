@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { PrismaClient } from '@prisma/client';
 import {
   TipoMensaje,
   ExtraccionIA,
@@ -10,12 +11,47 @@ import {
 import { getModelConfig } from './model-config';
 
 // ============================================
-// Configuración de OpenAI
+// Configuración de OpenAI y Prisma
 // ============================================
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+const prisma = new PrismaClient();
+
+// ============================================
+// Helpers para contexto
+// ============================================
+
+let cachedAreas: string[] | null = null;
+let cachedProyectos: string[] | null = null;
+
+async function getAreasVida(): Promise<string[]> {
+  if (!cachedAreas) {
+    const areas = await prisma.areasVida.findMany({
+      select: { nombre: true },
+      orderBy: { nombre: 'asc' }
+    });
+    cachedAreas = areas.map(a => a.nombre);
+  }
+  return cachedAreas;
+}
+
+async function getProyectosActivos(): Promise<string[]> {
+  if (!cachedProyectos) {
+    const proyectos = await prisma.proyectoEstrategico.findMany({
+      where: {
+        estado: { in: ['planificacion', 'en_curso'] }
+      },
+      select: { nombre: true },
+      orderBy: { nombre: 'asc' },
+      take: 20 // Limitar a 20 proyectos más recientes
+    });
+    cachedProyectos = proyectos.map(p => p.nombre);
+  }
+  return cachedProyectos;
+}
 
 // ============================================
 // Prompts Específicos por Tipo
@@ -38,7 +74,11 @@ Extrae los siguientes campos en formato JSON:
 Responde SOLO con el JSON, sin texto adicional.
 `.trim(),
 
-  registro: (texto: string) => `
+  registro: async (texto: string) => {
+    const areas = await getAreasVida();
+    const proyectos = await getProyectosActivos();
+    
+    return `
 Extrae de esta nota un REGISTRO de actividad PASADA (algo que YA HICE).
 
 Transcripción: "${texto}"
@@ -47,13 +87,19 @@ Extrae los siguientes campos en formato JSON:
 {
   "descripcion": "string (qué hice, en pasado)",
   "duracion_horas": "number (si menciona tiempo: '2 horas'=2, 'toda la mañana'=4, 'media hora'=0.5, sino null)",
-  "proyecto": "string (si menciona nombre de proyecto/cliente, sino null)",
+  "proyecto_nombre": "string (IMPORTANTE: Si menciona un proyecto, busca el nombre EXACTO en esta lista: [${proyectos.join(', ')}]. Si no coincide con ninguno o no menciona proyecto, usa 'otros')",
   "personas_involucradas": ["array de nombres de personas mencionadas"],
-  "categoria": "TRABAJO | PERSONAL | SOCIAL | OTRO (inferir del contexto)"
+  "area_vida_nombre": "string (IMPORTANTE: Clasifica la actividad en UNA de estas áreas: [${areas.join(', ')}]. Elige la más apropiada según el contexto de la actividad)"
 }
 
+REGLAS IMPORTANTES:
+- proyecto_nombre: DEBE ser uno de la lista de proyectos activos o 'otros'
+- area_vida_nombre: DEBE ser exactamente uno de los nombres de la lista de áreas
+- Si hay duda sobre el proyecto, usar 'otros'
+
 Responde SOLO con el JSON, sin texto adicional.
-`.trim(),
+`.trim();
+  },
 
   compromiso: (texto: string) => `
 Extrae de esta nota un COMPROMISO con otra persona.
@@ -125,7 +171,11 @@ export async function extractEntities(
     // Obtener configuración de modelo
     const modelConfig = getModelConfig('extraction');
 
-    const prompt = PROMPTS[tipo](texto);
+    // Generar prompt (puede ser async para registro)
+    const promptFn = PROMPTS[tipo];
+    const prompt = typeof promptFn === 'function' 
+      ? await (promptFn as any)(texto)
+      : promptFn;
 
     const response = await openai.chat.completions.create({
       model: modelConfig.model,

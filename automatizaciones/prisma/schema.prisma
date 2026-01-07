@@ -102,22 +102,24 @@ model Registro {
   id                    Int       @id @default(autoincrement())
   descripcion           String    @db.Text
   duracionHoras         Float?
-  proyecto              String?
+  proyectoNombre        String?   // Nombre del proyecto (texto libre, puede ser "otros")
   personasInvolucradas  String[]
-  categoria             Categoria @default(TRABAJO)
   fechaActividad        DateTime  @default(now())
 
   // Relaciones
   notaAudioId           Int
   notaAudio             NotaAudio @relation(fields: [notaAudioId], references: [id], onDelete: Cascade)
+  
+  areaVidaId            Int?
+  areaVida              AreasVida? @relation(fields: [areaVidaId], references: [id], onDelete: SetNull)
 
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
   @@index([notaAudioId])
   @@index([fechaActividad])
-  @@index([categoria])
-  @@index([proyecto])
+  @@index([areaVidaId])
+  @@index([proyectoNombre])
   @@map("registros")
 }
 
@@ -163,6 +165,9 @@ model AreasVida {
   colorHex            String?   @map("color_hex") @db.VarChar(7)
   ordenVisualizacion  Int?      @map("orden_visualizacion")
   activa              Boolean?
+
+  // Relaciones
+  registros           Registro[]
 
   @@map("areas_vida")
 }
@@ -342,13 +347,6 @@ enum Prioridad {
   MEDIA
   ALTA
   URGENTE
-}
-
-enum Categoria {
-  TRABAJO
-  PERSONAL
-  SOCIAL
-  OTRO
 }
 
 enum TipoMoscow {

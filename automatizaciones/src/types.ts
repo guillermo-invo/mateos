@@ -44,9 +44,9 @@ export interface CompromisoExtraido {
 export interface RegistroExtraido {
   descripcion: string;
   duracion_horas?: number;
-  proyecto?: string;
+  proyecto_nombre?: string; // Nombre del proyecto o "otros"
   personas_involucradas?: string[];
-  categoria: 'TRABAJO' | 'PERSONAL' | 'SOCIAL' | 'OTRO';
+  area_vida_nombre: string; // Nombre del área de vida (debe existir en BD)
 }
 
 export interface IdeaExtraida {
