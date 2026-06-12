@@ -247,6 +247,7 @@ model Proyecto {
 **Proyectos:**
 - `Proyecto`: Proyectos simples (legacy)
 - `ProyectoEstrategico`: Proyectos V2 con planificación completa
+- `SubProyecto`: Proyectos emergentes (alianzas, colaboraciones) - **NUEVO 2026-01-30**
 
 **Tareas:**
 - `Tarea`: Tareas asociadas a proyectos
@@ -264,6 +265,15 @@ model Proyecto {
 - `Destreza`: Habilidades/fortalezas
 - `Dificultad`: Limitaciones/debilidades
 - `MotivoPersonal`: Motivaciones personales
+
+**Personas y Organizaciones (NUEVO 2026-01-30):**
+- `Persona`: Contactos personales y profesionales (2089 importados de Google Contacts)
+- `Organizacion`: Organizaciones con las que se relaciona el usuario
+- `PersonaOrganizacion`: Relación N:M persona-organización (cargos, vínculos)
+- `SubProyectoOrganizacion`: Organizaciones socias de cada sub-proyecto
+- `Contacto`: Registro de interacciones (reuniones, llamadas, emails)
+- `ContactoPersona`, `ContactoOrganizacion`, `ContactoSubProyecto`, `ContactoProyectoEstrategico`: Tablas intermedias N:M
+- `PersonaProyecto`: Participación de personas en proyectos
 
 ### Enums Principales
 
@@ -361,5 +371,5 @@ npx prisma db seed
 
 ---
 
-**Última actualización:** 2025-12-26
-**Versión:** 1.0
+**Última actualización:** 2026-01-30
+**Versión:** 1.1

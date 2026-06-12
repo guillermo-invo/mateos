@@ -8,8 +8,6 @@ services:
     image: postgres:15.5-alpine
     container_name: transcripcion-postgres
     restart: unless-stopped
-    ports:
-      - "1432:5432"
     environment:
       POSTGRES_USER: ${DB_USER:-asistente}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-n8npass}
@@ -66,8 +64,6 @@ services:
     volumes:
       - ./next-app/logs:/app/logs
       - ./next-app/models-config.json:/app/models-config.json:ro
-    ports:
-      - "1400:3000"
 
   # ============================================
   # Automatizaciones (Procesamiento IA)
@@ -106,8 +102,6 @@ services:
       - involucra-network
     volumes:
       - ./automatizaciones/models-config.json:/app/models-config.json:ro
-    ports:
-      - "1410:3100"
 
   # ============================================
   # Telegram Bot
@@ -146,9 +140,6 @@ services:
     volumes:
       - ./obsidian:/config
       - /home/azureuser/obsidian:/vaults
-    ports:
-      - "1420:3000"
-      - "1421:3001"
     networks:
       - app-network
       - involucra-network

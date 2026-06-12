@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, TipoEstadoProyecto } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+const ESTADOS_VISIBLES: TipoEstadoProyecto[] = [
+  TipoEstadoProyecto.planificacion,
+  TipoEstadoProyecto.en_curso,
+];
+
 interface ProyectoConCalculos {
+
+
+
+
   id: number;
   nombre: string;
   estado: string;
@@ -29,7 +38,14 @@ interface AreaConProyectos {
 export async function GET() {
   try {
     // Get all projects with their subtasks
+    const estadosActivos: Array<'planificacion' | 'en_curso'> = ['planificacion', 'en_curso'];
+
     const proyectos = await prisma.proyectoEstrategico.findMany({
+      where: {
+        estado: {
+          in: ['planificacion', 'en_curso'],
+        },
+      },
       include: {
         tareasEstrategicas: {
           include: {
@@ -46,6 +62,9 @@ export async function GET() {
         createdAt: 'desc',
       },
     });
+
+
+
 
     // Get all areas de vida
     const areas = await prisma.areasVida.findMany({

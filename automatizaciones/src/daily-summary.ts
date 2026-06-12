@@ -220,14 +220,14 @@ export async function generateAISummary(data: DailySummaryData): Promise<string>
   console.log('🧠 Generando resumen con IA...');
 
   const prompt = `
-Eres un asistente personal que genera resúmenes diarios.
+Sos el asistente personal de Guille. Generá el resumen del día en formato BULLET POINTS concreto.
 
-Basándote en los siguientes datos del día de hoy, genera un resumen ejecutivo conversacional en español (tú/vos), como si le hablaras a tu usuario:
+Datos del día:
 
 **Registros (lo que hizo hoy):**
 ${JSON.stringify(data.registros, null, 2)}
 
-**Tareas pendientes (debe hacer):**
+**Tareas pendientes:**
 ${JSON.stringify(data.tareas, null, 2)}
 
 **Compromisos:**
@@ -236,16 +236,32 @@ ${JSON.stringify(data.compromisos, null, 2)}
 **Ideas:**
 ${JSON.stringify(data.ideas, null, 2)}
 
-Formato del resumen:
-1. Saludo personalizado
-2. Resumen de actividades realizadas (registros) - enfatizar logros
-3. Tareas pendientes más importantes
-4. Compromisos activos
-5. Ideas capturadas
-6. Cierre motivacional
+FORMATO OBLIGATORIO - solo bullets, cero párrafos:
 
-Usa emojis apropiados, sé conciso pero amigable. Máximo 600 palabras.
-Si no hay datos en alguna categoría, mencionarlo brevemente sin ser negativo.
+📅 *Resumen del día*
+
+✅ *Lo que hiciste*
+• Resumen concreto de cada registro (1 línea c/u)
+
+📋 *Tareas pendientes*
+• Tarea con prioridad y vencimiento si tiene
+
+🤝 *Compromisos*
+• Compromiso + con quién + deadline
+
+💡 *Ideas*
+• Idea + categoría
+
+⚡ *Para mañana*
+• Si hay tareas pendientes o compromisos próximos, 1-2 bullets de lo más urgente
+
+REGLAS:
+- CERO párrafos narrados. Solo bullets concretos.
+- CERO saludos, cierres motivacionales ni relleno.
+- Cada bullet = 1 hecho/tarea/idea. Max 15 palabras por bullet.
+- Si una sección no tiene datos, no la incluyas.
+- Emojis solo en los títulos de sección.
+- Max 400 palabras total.
 `;
 
   try {

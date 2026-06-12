@@ -1,8 +1,10 @@
+root_context: true
+
 # Mateos - Sistema Personal de Gestión de Tiempo y Tareas
 
 > **Propósito:** Sistema integral de gestión de tiempo, tareas y proyectos optimizado para productividad con TDAH, con captura por voz, planificación estratégica multinivel, y tracking de compromisos para marca personal.
 
-**Última actualización:** 2025-12-24
+**Última actualización:** 2026-01-30
 **Estado:** En producción activa
 **Branch principal:** `master`
 **Branch actual:** `feature/ui-improvements`
@@ -112,9 +114,18 @@ Gestión de tiempo y tareas para personas con TDAH que necesitan:
 - **Ubicación física:** `/var/lib/docker/volumes/mateos_postgres-data/_data`
 
 **Conexión desde host:**
-```bash
-docker exec -i transcripcion-postgres psql -U asistente -d asistente_db
-```
+- Abrir consola interactiva:
+  ```bash
+  docker exec -it transcripcion-postgres psql -U asistente -d asistente_db
+  ```
+- Ejecutar una sentencia puntual:
+  ```bash
+  docker exec -i transcripcion-postgres psql -U asistente -d asistente_db -c "SELECT NOW();"
+  ```
+- Aplicar scripts/migraciones desde un archivo local:
+  ```bash
+  docker exec -i transcripcion-postgres psql -U asistente -d asistente_db < ruta/al/script.sql
+  ```
 
 ### Diagrama de Estructura de Base de Datos
 
@@ -176,7 +187,31 @@ docker exec -i transcripcion-postgres psql -U asistente -d asistente_db
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
-│ 5. OTROS                                                             │
+│ 5. PERSONAS Y ORGANIZACIONES (2026-01-30)                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  personas ──┐                                                       │
+│             ├─→ personas_organizaciones (cargos, vínculos)         │
+│  organizaciones ─┘                                                  │
+│                                                                      │
+│  personas ──┬─→ personas_proyectos (participación en proyectos)    │
+│             └─→ contactos_personas                                  │
+│                                                                      │
+│  organizaciones ──→ contactos_organizaciones                        │
+│                 ──→ sub_proyectos_organizaciones (orgs socias)     │
+│                                                                      │
+│  sub_proyectos ──→ proyecto_estrategico (FK opcional)              │
+│               ──→ area_vida (FK opcional)                          │
+│               ──→ organizacion_lider / persona_lider               │
+│                                                                      │
+│  contactos ──→ Tablas intermedias para N:M con:                    │
+│               personas, organizaciones, sub_proyectos,             │
+│               proyectos_estrategicos                                │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ 6. OTROS                                                             │
 ├─────────────────────────────────────────────────────────────────────┤
 │  registros (actividades pasadas)                                    │
 │  logs_generacion_ia (auditoría de IA)                               │
@@ -191,6 +226,12 @@ docker exec -i transcripcion-postgres psql -U asistente -d asistente_db
 │  destrezas (1) ──→ (N) subtareas_estrategicas                      │
 │  proyectos_estrategicos (1) ──→ (N) ideas_capturadas               │
 │  proyectos_estrategicos (1) ──→ (N) logs_generacion_ia             │
+│  proyectos_estrategicos (1) ──→ (N) sub_proyectos                  │
+│                                                                      │
+│  personas (N) ←──→ (N) organizaciones (via personas_organizaciones)│
+│  personas (N) ←──→ (N) contactos (via contactos_personas)          │
+│  organizaciones (N) ←──→ (N) contactos (via contactos_orgs)        │
+│  sub_proyectos (N) ←──→ (N) organizaciones (via sub_proy_orgs)     │
 │                                                                      │
 │  DENORMALIZACIÓN:                                                    │
 │  subtareas_estrategicas.proyecto_nombre ← proyectos.nombre          │
@@ -257,7 +298,48 @@ docker exec -i transcripcion-postgres psql -U asistente -d asistente_db
   - Categorías: `tiempo`, `planificacion`, `integraciones`, `notificaciones`, `sistema`
   - Valores por defecto optimizados para TDAH
 
-#### 8. Otros
+#### 8. Personas y Organizaciones (NUEVO 2026-01-30)
+- **`personas`**: Contactos personales y profesionales
+  - Datos de contacto: email, teléfono, whatsapp, redes sociales
+  - Clasificación: `tipo_relacion` (voluntario, cliente, colaborador, donante, etc.)
+  - Gestión de relaciones: `es_contacto_estrella`, `puntuacion_importancia` (1-10)
+  - Frecuencia de contacto ideal, eneatipo, intereses (array)
+  - **Importado:** 2089 contactos desde Google Contacts (2026-01-30)
+- **`organizaciones`**: Organizaciones con las que se relaciona el usuario
+  - Datos institucionales: nombre, siglas, tipo, sector, misión/visión
+  - Clasificación: `tipo_organizacion` (ong, fundacion, empresa_social, etc.)
+  - Gestión: `naturaleza_relacion`, `es_organizacion_estrella`, `puntuacion_importancia`
+  - Datos adicionales: RSE, voluntariado, tamaño
+- **`personas_organizaciones`**: Relación persona-organización (cargos, vínculos)
+  - Campos: cargo, tipo_vinculacion, es_actual, nivel_decision, responsabilidades
+
+#### 9. Sub-proyectos (NUEVO 2026-01-30)
+- **`sub_proyectos`**: Proyectos que surgen en la marcha (alianzas, colaboraciones)
+  - **Diferencia con proyectos_estrategicos:** Los estratégicos los elige el usuario, los sub_proyectos surgen orgánicamente
+  - Vinculación opcional a: `area_vida_id`, `proyecto_estrategico_id`
+  - Liderazgo: `organizacion_lider_id`, `persona_lider_id`
+  - Mi rol: `mi_responsabilidad` (liderar, apoyar, asesorar, seguimiento)
+  - Presupuesto y horas: estimadas, aprobadas, ejecutadas
+  - Estados: idea, planificacion, aprobado, activo, pausado, completado, cancelado, archivado
+- **`sub_proyectos_organizaciones`**: Organizaciones socias de cada sub-proyecto
+
+#### 10. Registro de Contactos (NUEVO 2026-01-30)
+- **`contactos`**: Registro de interacciones con personas y organizaciones
+  - Tipo: reunion, llamada, email, whatsapp, videollamada, evento, casual, almuerzo, cafe
+  - Canal: presencial, zoom, meet, teams, telefono, instagram, linkedin, etc.
+  - Seguimiento: `requiere_seguimiento`, `fecha_proximo_contacto`
+  - Resultados: `acuerdos_alcanzados`, `tareas_generadas`, `compromisos_generados` (texto libre)
+  - Referencia externa: `transcripcion_externa_id` (para vincular con transcripciones externas)
+- **Tablas intermedias** (relaciones N:M):
+  - `contactos_personas`: Personas involucradas en cada contacto
+  - `contactos_organizaciones`: Organizaciones involucradas
+  - `contactos_sub_proyectos`: Sub-proyectos relacionados
+  - `contactos_proyectos_estrategicos`: Proyectos estratégicos relacionados
+- **`personas_proyectos`**: Participación de personas en proyectos
+  - Puede vincular a `proyecto_estrategico_id` y/o `sub_proyecto_id`
+  - Rol, fechas de participación, estado, horas dedicadas
+
+#### 11. Otros
 - **`registros`**: Actividades ya realizadas (tracking de pasado)
 - **`ideas_capturadas`**: Ideas sin implementar
 - **`logs_generacion_ia`**: Logs de uso de IA (prompts, respuestas, tokens)
@@ -571,7 +653,7 @@ R2_SECRET_ACCESS_KEY="..."
 
 ---
 
-## 🚦 Estado Actual (2026-01-03)
+## 🚦 Estado Actual (2026-01-30)
 
 ### ✅ Implementado
 - [x] Captura de notas de voz vía Telegram
@@ -589,6 +671,16 @@ R2_SECRET_ACCESS_KEY="..."
 - [x] **Integración completa bidireccional con Google Calendar API** (2026-01-03)
 - [x] **Scripts de sincronización automática con Calendar** (2026-01-03)
 - [x] **Análisis de disponibilidad real cruzando múltiples calendarios** (2026-01-03)
+- [x] **Sistema de Personas y Organizaciones** (2026-01-30)
+  - 11 tablas nuevas para gestión de contactos y relaciones
+  - Importación de 2089 contactos desde Google Contacts
+  - Normalización automática de teléfonos (código país 598 Uruguay)
+- [x] **Sistema de Sub-proyectos** (2026-01-30)
+  - Proyectos emergentes (alianzas, colaboraciones)
+  - Vinculación con organizaciones socias
+- [x] **Sistema de Registro de Contactos/Interacciones** (2026-01-30)
+  - Tracking de reuniones, llamadas, emails con personas/organizaciones
+  - Seguimiento de acuerdos y próximos pasos
 
 ### 🚧 En Desarrollo
 - [ ] Dashboard visual de métricas en Next.js

@@ -102,22 +102,24 @@ model Registro {
   id                    Int       @id @default(autoincrement())
   descripcion           String    @db.Text
   duracionHoras         Float?
-  proyecto              String?
+  proyectoNombre        String?   // Nombre del proyecto (texto libre, puede ser "otros")
   personasInvolucradas  String[]
-  categoria             Categoria @default(TRABAJO)
   fechaActividad        DateTime  @default(now())
 
   // Relaciones
   notaAudioId           Int
   notaAudio             NotaAudio @relation(fields: [notaAudioId], references: [id], onDelete: Cascade)
+  
+  areaVidaId            Int?
+  areaVida              AreasVida? @relation(fields: [areaVidaId], references: [id], onDelete: SetNull)
 
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
   @@index([notaAudioId])
   @@index([fechaActividad])
-  @@index([categoria])
-  @@index([proyecto])
+  @@index([areaVidaId])
+  @@index([proyectoNombre])
   @@map("registros")
 }
 
@@ -139,6 +141,8 @@ model IdeaCapturada {
   proyectoEstrategicoId Int?                 @map("proyecto_estrategico_id")
   proyectoEstrategico   ProyectoEstrategico? @relation(fields: [proyectoEstrategicoId], references: [id])
 
+  areaVidaId          Int?
+  areaVida            AreasVida? @relation(fields: [areaVidaId], references: [id], onDelete: SetNull)
 
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
@@ -146,6 +150,7 @@ model IdeaCapturada {
   @@index([notaAudioId])
   @@index([implementada])
   @@index([categoria])
+  @@index([areaVidaId])
   @@map("ideas_capturadas")
 }
 
@@ -163,6 +168,11 @@ model AreasVida {
   colorHex            String?   @map("color_hex") @db.VarChar(7)
   ordenVisualizacion  Int?      @map("orden_visualizacion")
   activa              Boolean?
+
+  // Relaciones
+  registros           Registro[]
+  ideas               IdeaCapturada[]
+  subProyectos        SubProyecto[]
 
   @@map("areas_vida")
 }
@@ -241,6 +251,9 @@ model ProyectoEstrategico {
   logsGeneracion     LogGeneracionIA[]
   ideasCapturadas    IdeaCapturada[]
   tareasSimples      Tarea[]
+  subProyectos       SubProyecto[]
+  contactosProyectosEstrategicos ContactoProyectoEstrategico[]
+  personasProyectos  PersonaProyecto[]
 
   @@map("proyectos_estrategicos")
 }
@@ -263,10 +276,12 @@ model TareaEstrategica {
   eisenhower                   TipoEisenhower?        @map("eisenhower")
   fechaInicio                  DateTime?              @map("fecha_inicio") @db.Date
   fechaFin                     DateTime?              @map("fecha_fin") @db.Date
+  deadLine                     DateTime?              @map("dead_line") @db.Date
   createdAt                    DateTime               @default(now()) @map("created_at")
   updatedAt                    DateTime               @updatedAt @map("updated_at")
   subtareasEstrategicas        SubtareaEstrategica[]
 
+  @@index([deadLine])
   @@map("tareas_estrategicas")
 }
 
@@ -283,11 +298,39 @@ model SubtareaEstrategica {
   destrezaPrincipal     Destrezas?          @relation(fields: [destrezaPrincipalId], references: [id])
   fechaInicio           DateTime?           @map("fecha_inicio") @db.Date
   fechaFin              DateTime?           @map("fecha_fin") @db.Date
+  deadLine              DateTime?           @map("dead_line") @db.Date
   createdAt             DateTime            @default(now()) @map("created_at")
   updatedAt             DateTime            @updatedAt @map("updated_at")
 
+  itemsEstrategicos     ItemEstrategico[]
+
+  @@index([deadLine])
   @@map("subtareas_estrategicas")
 }
+
+model ItemEstrategico {
+  id                    Int                 @id @default(autoincrement())
+  subtareaEstrategicaId Int                 @map("subtarea_estrategica_id")
+  subtareaEstrategica   SubtareaEstrategica @relation(fields: [subtareaEstrategicaId], references: [id], onDelete: Cascade)
+  nombre                String              @db.VarChar(255)
+  done                  Boolean             @default(false)
+  fechaDone             DateTime?           @map("fecha_done") @db.Timestamp
+  tiempoEstimadoMinutos Int?                @map("tiempo_estimado_minutos")
+  moscow                TipoMoscow?
+  fechaInicio           DateTime?           @map("fecha_inicio") @db.Date
+  fechaFin              DateTime?           @map("fecha_fin") @db.Date
+  deadLine              DateTime?           @map("dead_line") @db.Date
+  proyectoNombre        String?             @map("proyecto_nombre") @db.VarChar(200)
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+
+  @@index([subtareaEstrategicaId])
+  @@index([done])
+  @@index([deadLine])
+  @@index([proyectoNombre])
+  @@map("items_estrategicos")
+}
+
 
 model LogGeneracionIA {
   id             Int       @id @default(autoincrement())
@@ -312,13 +355,6 @@ enum Prioridad {
   MEDIA
   ALTA
   URGENTE
-}
-
-enum Categoria {
-  TRABAJO
-  PERSONAL
-  SOCIAL
-  OTRO
 }
 
 enum TipoMoscow {
@@ -431,4 +467,294 @@ enum EstadoProcesamiento {
   PROCESANDO
   COMPLETADO
   ERROR
+}
+
+// ============================================
+// Sistema de Personas, Organizaciones y Sub-proyectos (2026-01-30)
+// ============================================
+
+model Persona {
+  id                    Int       @id @default(autoincrement())
+  nombreCompleto        String    @map("nombre_completo") @db.VarChar(255)
+  apodo                 String?   @db.VarChar(100)
+  trato                 String?   @db.VarChar(50) // formal, coloquial, informal, jocoso
+  email                 String?   @db.VarChar(255)
+  telefono              String?   @db.VarChar(50)
+  whatsapp              String?   @db.VarChar(50)
+  instagram             String?   @db.VarChar(100)
+  xTwitter              String?   @map("x_twitter") @db.VarChar(100)
+  tiktok                String?   @db.VarChar(100)
+  linkedin              String?   @db.VarChar(500)
+  youtube               String?   @db.VarChar(500)
+  tipoRelacion          String?   @map("tipo_relacion") @db.VarChar(50) // voluntario, cliente, colaborador, donante, beneficiario, aliado, mentor, amigo
+  esContactoEstrella    Boolean   @default(false) @map("es_contacto_estrella")
+  puntuacionImportancia Int?      @map("puntuacion_importancia")
+  fechaUltimoContacto   DateTime? @map("fecha_ultimo_contacto") @db.Date
+  frecuenciaContactoIdeal String? @map("frecuencia_contacto_ideal") @db.VarChar(50) // diario, semanal, quincenal, mensual, trimestral, semestral, anual
+  eneatipo              String?   @db.VarChar(50)
+  intereses             String[]
+  otraInformacion       String?   @map("otra_informacion") @db.Text
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  // Relaciones
+  personasOrganizaciones PersonaOrganizacion[]
+  contactosPersonas      ContactoPersona[]
+  personasProyectos      PersonaProyecto[]
+  subProyectosLiderados  SubProyecto[] @relation("PersonaLider")
+
+  @@index([nombreCompleto])
+  @@index([tipoRelacion])
+  @@index([esContactoEstrella])
+  @@map("personas")
+}
+
+model Organizacion {
+  id                    Int       @id @default(autoincrement())
+  nombreOrganizacion    String    @map("nombre_organizacion") @db.VarChar(255)
+  nombreCorto           String?   @map("nombre_corto") @db.VarChar(100)
+  siglas                String?   @db.VarChar(20)
+  tipoOrganizacion      String?   @map("tipo_organizacion") @db.VarChar(50) // ong, fundacion, empresa_social, empresa_privada, gobierno, universidad, colectivo, cooperativa, asociacion_civil, startup, multinacional
+  sectorActividad       String?   @map("sector_actividad") @db.VarChar(100)
+  miVinculo             String?   @map("mi_vinculo") @db.Text
+  emailPrincipal        String?   @map("email_principal") @db.VarChar(255)
+  telefonoPrincipal     String?   @map("telefono_principal") @db.VarChar(50)
+  sitioWeb              String?   @map("sitio_web") @db.VarChar(500)
+  direccion             String?   @db.Text
+  ciudad                String?   @db.VarChar(100)
+  pais                  String?   @default("Uruguay") @db.VarChar(100)
+  instagram             String?   @db.VarChar(100)
+  xTwitter              String?   @map("x_twitter") @db.VarChar(100)
+  tiktok                String?   @db.VarChar(100)
+  linkedin              String?   @db.VarChar(500)
+  youtube               String?   @db.VarChar(500)
+  facebook              String?   @db.VarChar(500)
+  naturalezaRelacion    String?   @map("naturaleza_relacion") @db.VarChar(50) // aliado_estrategico, proveedor_servicios, cliente, financiador, beneficiario, socio, competidor_amigable
+  esOrganizacionEstrella Boolean  @default(false) @map("es_organizacion_estrella")
+  puntuacionImportancia Int?      @map("puntuacion_importancia")
+  fechaPrimerContacto   DateTime? @map("fecha_primer_contacto") @db.Date
+  fechaUltimoContacto   DateTime? @map("fecha_ultimo_contacto") @db.Date
+  frecuenciaContactoIdeal String? @map("frecuencia_contacto_ideal") @db.VarChar(50)
+  misionVision          String?   @map("mision_vision") @db.Text
+  areasTrabajo          String[]  @map("areas_trabajo")
+  rse                   String?   @db.Text
+  haceVoluntariado      String?   @map("hace_voluntariado") @db.Text
+  tamanioOrganizacion   String?   @map("tamanio_organizacion") @db.VarChar(50) // micro, pequena, mediana, grande
+  notasAdicionales      String?   @map("notas_adicionales") @db.Text
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  // Relaciones
+  personasOrganizaciones    PersonaOrganizacion[]
+  contactosOrganizaciones   ContactoOrganizacion[]
+  subProyectosLiderados     SubProyecto[] @relation("OrganizacionLider")
+  subProyectosOrganizaciones SubProyectoOrganizacion[]
+
+  @@index([nombreOrganizacion])
+  @@index([tipoOrganizacion])
+  @@index([esOrganizacionEstrella])
+  @@map("organizaciones")
+}
+
+model PersonaOrganizacion {
+  id                Int       @id @default(autoincrement())
+  personaId         Int       @map("persona_id")
+  persona           Persona   @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  organizacionId    Int       @map("organizacion_id")
+  organizacion      Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  cargoTitulo       String?   @map("cargo_titulo") @db.VarChar(255)
+  tipoVinculacion   String?   @map("tipo_vinculacion") @db.VarChar(50) // empleado, voluntario, consultor, directivo, socio, fundador, asesor, pasante
+  fechaInicio       DateTime? @map("fecha_inicio") @db.Date
+  fechaFin          DateTime? @map("fecha_fin") @db.Date
+  esActual          Boolean   @default(true) @map("es_actual")
+  nivelDecision     String?   @map("nivel_decision") @db.VarChar(50) // estrategico, tactico, operativo, ninguno
+  responsabilidades String?   @db.Text
+  logrosDestacados  String?   @map("logros_destacados") @db.Text
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@unique([personaId, organizacionId, cargoTitulo])
+  @@index([personaId])
+  @@index([organizacionId])
+  @@index([esActual])
+  @@map("personas_organizaciones")
+}
+
+model SubProyecto {
+  id                    Int       @id @default(autoincrement())
+  nombre                String    @db.VarChar(255)
+  nombreCorto           String?   @map("nombre_corto") @db.VarChar(100)
+  codigoProyecto        String?   @unique @map("codigo_proyecto") @db.VarChar(50)
+  areaVidaId            Int?      @map("area_vida_id")
+  areaVida              AreasVida? @relation(fields: [areaVidaId], references: [id], onDelete: SetNull)
+  proyectoEstrategicoId Int?      @map("proyecto_estrategico_id")
+  proyectoEstrategico   ProyectoEstrategico? @relation(fields: [proyectoEstrategicoId], references: [id], onDelete: SetNull)
+  descripcion           String?   @db.Text
+  objetivoGeneral       String?   @map("objetivo_general") @db.Text
+  objetivosEspecificos  String[]  @map("objetivos_especificos")
+  estado                String    @default("idea") @db.VarChar(50) // idea, planificacion, aprobado, activo, pausado, completado, cancelado, archivado
+  fechaInicio           DateTime? @map("fecha_inicio") @db.Date
+  fechaFinEstimada      DateTime? @map("fecha_fin_estimada") @db.Date
+  fechaFinReal          DateTime? @map("fecha_fin_real") @db.Date
+  duracionEstimadaMeses Int?      @map("duracion_estimada_meses")
+  prioridad             String    @default("media") @db.VarChar(50) // baja, media, alta, critica, estrategica
+  porcentajeCompletado  Int       @default(0) @map("porcentaje_completado")
+  organizacionLiderId   Int?      @map("organizacion_lider_id")
+  organizacionLider     Organizacion? @relation("OrganizacionLider", fields: [organizacionLiderId], references: [id], onDelete: SetNull)
+  personaLiderId        Int?      @map("persona_lider_id")
+  personaLider          Persona?  @relation("PersonaLider", fields: [personaLiderId], references: [id], onDelete: SetNull)
+  miResponsabilidad     String?   @map("mi_responsabilidad") @db.VarChar(50) // liderar, liderar_seccion, participacion_horizontal, apoyar, asesorar, seguimiento
+  presupuestoEstimado   Decimal?  @map("presupuesto_estimado") @db.Decimal(15, 2)
+  presupuestoAprobado   Decimal?  @map("presupuesto_aprobado") @db.Decimal(15, 2)
+  presupuestoEjecutado  Decimal?  @map("presupuesto_ejecutado") @db.Decimal(15, 2)
+  moneda                String    @default("UYU") @db.VarChar(10)
+  misHorasPresupuestadas Decimal? @map("mis_horas_presupuestadas") @db.Decimal(8, 2)
+  misHorasEjecutadas    Decimal?  @map("mis_horas_ejecutadas") @db.Decimal(8, 2)
+  indicadoresExito      String[]  @map("indicadores_exito")
+  resultadosAlcanzados  String?   @map("resultados_alcanzados") @db.Text
+  aprendizajes          String?   @db.Text
+  etiquetas             String[]
+  notasInternas         String?   @map("notas_internas") @db.Text
+  comoSurgio            String?   @map("como_surgio") @db.Text
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  // Relaciones
+  subProyectosOrganizaciones SubProyectoOrganizacion[]
+  contactosSubProyectos      ContactoSubProyecto[]
+  personasProyectos          PersonaProyecto[]
+
+  @@index([nombre])
+  @@index([estado])
+  @@index([prioridad])
+  @@index([areaVidaId])
+  @@index([proyectoEstrategicoId])
+  @@map("sub_proyectos")
+}
+
+model SubProyectoOrganizacion {
+  id                Int          @id @default(autoincrement())
+  subProyectoId     Int          @map("sub_proyecto_id")
+  subProyecto       SubProyecto  @relation(fields: [subProyectoId], references: [id], onDelete: Cascade)
+  organizacionId    Int          @map("organizacion_id")
+  organizacion      Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  rolOrganizacion   String?      @map("rol_organizacion") @db.VarChar(100)
+  fechaIncorporacion DateTime?   @map("fecha_incorporacion") @db.Date
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  @@unique([subProyectoId, organizacionId])
+  @@index([subProyectoId])
+  @@index([organizacionId])
+  @@map("sub_proyectos_organizaciones")
+}
+
+model Contacto {
+  id                    Int       @id @default(autoincrement())
+  tipoContacto          String?   @map("tipo_contacto") @db.VarChar(50) // reunion, llamada, email, whatsapp, mensaje_directo, videollamada, evento, casual, almuerzo, cafe
+  canalContacto         String?   @map("canal_contacto") @db.VarChar(50) // presencial, zoom, meet, teams, telefono, instagram, linkedin, twitter, email, whatsapp
+  fechaContacto         DateTime  @map("fecha_contacto")
+  asunto                String?   @db.VarChar(500)
+  resumen               String?   @db.Text
+  acuerdosAlcanzados    String[]  @map("acuerdos_alcanzados")
+  tareasGeneradas       String[]  @map("tareas_generadas") // Texto libre, sin FK
+  compromisosGenerados  String[]  @map("compromisos_generados") // Texto libre, sin FK
+  requiereSeguimiento   Boolean   @default(false) @map("requiere_seguimiento")
+  fechaProximoContacto  DateTime? @map("fecha_proximo_contacto") @db.Date
+  notasSeguimiento      String?   @map("notas_seguimiento") @db.Text
+  otrasPersonasPresentes String[] @map("otras_personas_presentes") // Texto libre
+  documentosAdjuntos    String[]  @map("documentos_adjuntos") // URLs
+  transcripcionExternaId String?  @map("transcripcion_externa_id") @db.VarChar(255) // ID o URL externa
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  // Relaciones
+  contactosPersonas             ContactoPersona[]
+  contactosOrganizaciones       ContactoOrganizacion[]
+  contactosSubProyectos         ContactoSubProyecto[]
+  contactosProyectosEstrategicos ContactoProyectoEstrategico[]
+
+  @@index([fechaContacto])
+  @@index([tipoContacto])
+  @@index([requiereSeguimiento])
+  @@map("contactos")
+}
+
+model ContactoPersona {
+  id          Int      @id @default(autoincrement())
+  contactoId  Int      @map("contacto_id")
+  contacto    Contacto @relation(fields: [contactoId], references: [id], onDelete: Cascade)
+  personaId   Int      @map("persona_id")
+  persona     Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([contactoId, personaId])
+  @@index([contactoId])
+  @@index([personaId])
+  @@map("contactos_personas")
+}
+
+model ContactoOrganizacion {
+  id             Int          @id @default(autoincrement())
+  contactoId     Int          @map("contacto_id")
+  contacto       Contacto     @relation(fields: [contactoId], references: [id], onDelete: Cascade)
+  organizacionId Int          @map("organizacion_id")
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@unique([contactoId, organizacionId])
+  @@index([contactoId])
+  @@index([organizacionId])
+  @@map("contactos_organizaciones")
+}
+
+model ContactoSubProyecto {
+  id            Int         @id @default(autoincrement())
+  contactoId    Int         @map("contacto_id")
+  contacto      Contacto    @relation(fields: [contactoId], references: [id], onDelete: Cascade)
+  subProyectoId Int         @map("sub_proyecto_id")
+  subProyecto   SubProyecto @relation(fields: [subProyectoId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  @@unique([contactoId, subProyectoId])
+  @@index([contactoId])
+  @@index([subProyectoId])
+  @@map("contactos_sub_proyectos")
+}
+
+model ContactoProyectoEstrategico {
+  id                    Int                 @id @default(autoincrement())
+  contactoId            Int                 @map("contacto_id")
+  contacto              Contacto            @relation(fields: [contactoId], references: [id], onDelete: Cascade)
+  proyectoEstrategicoId Int                 @map("proyecto_estrategico_id")
+  proyectoEstrategico   ProyectoEstrategico @relation(fields: [proyectoEstrategicoId], references: [id], onDelete: Cascade)
+  createdAt             DateTime            @default(now()) @map("created_at")
+
+  @@unique([contactoId, proyectoEstrategicoId])
+  @@index([contactoId])
+  @@index([proyectoEstrategicoId])
+  @@map("contactos_proyectos_estrategicos")
+}
+
+model PersonaProyecto {
+  id                    Int                  @id @default(autoincrement())
+  personaId             Int                  @map("persona_id")
+  persona               Persona              @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  proyectoEstrategicoId Int?                 @map("proyecto_estrategico_id")
+  proyectoEstrategico   ProyectoEstrategico? @relation(fields: [proyectoEstrategicoId], references: [id], onDelete: Cascade)
+  subProyectoId         Int?                 @map("sub_proyecto_id")
+  subProyecto           SubProyecto?         @relation(fields: [subProyectoId], references: [id], onDelete: Cascade)
+  rolProyecto           String?              @map("rol_proyecto") @db.VarChar(100) // coordinador, voluntario, beneficiario, mentor, asesor, donante, facilitador
+  fechaInicioParticipacion DateTime?         @map("fecha_inicio_participacion") @db.Date
+  fechaFinParticipacion DateTime?            @map("fecha_fin_participacion") @db.Date
+  estadoParticipacion   String               @default("activo") @map("estado_participacion") @db.VarChar(50) // activo, inactivo, pausado, completado
+  horasDedicadas        Decimal?             @map("horas_dedicadas") @db.Decimal(8, 2)
+  contribucionDestacada String?              @map("contribucion_destacada") @db.Text
+  createdAt             DateTime             @default(now()) @map("created_at")
+  updatedAt             DateTime             @updatedAt @map("updated_at")
+
+  @@index([personaId])
+  @@index([proyectoEstrategicoId])
+  @@index([subProyectoId])
+  @@index([estadoParticipacion])
+  @@map("personas_proyectos")
 }

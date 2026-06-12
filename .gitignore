@@ -59,3 +59,15 @@ docker-compose.override.yml
 secrets/
 google-calendar-service-account.json
 *service-account*.json
+
+# Backups de base de datos
+backups/*.sql
+backups/*.sql.gz
+backups/*.sql.bz2
+
+# Archivos temporales y exports
+*.bak
+*.csv
+
+# Obsidian cache
+obsidian/

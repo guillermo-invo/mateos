@@ -22,3 +22,72 @@ html.dark {
   background-color: #1a202c; /* Example dark background */
   color: #e2e8f0; /* Example light text */
 }
+
+/* Frappe Gantt Custom Styles */
+.gantt-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+/* Proyectos - Azul */
+.gantt-proyecto .bar {
+  fill: #3b82f6 !important;
+}
+
+.gantt-proyecto .bar-progress {
+  fill: #2563eb !important;
+}
+
+/* Tareas - Verde */
+.gantt-tarea .bar {
+  fill: #10b981 !important;
+}
+
+.gantt-tarea .bar-progress {
+  fill: #059669 !important;
+}
+
+/* Subtareas - Naranja */
+.gantt-subtarea .bar {
+  fill: #f59e0b !important;
+}
+
+.gantt-subtarea .bar-progress {
+  fill: #d97706 !important;
+}
+
+/* Popup personalizado */
+.gantt-popup {
+  padding: 12px;
+  min-width: 200px;
+}
+
+.gantt-popup-title {
+  font-weight: bold;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.gantt-popup-dates {
+  font-size: 12px;
+  color: #666;
+}
+
+/* Dark mode support */
+html.dark .gantt-popup {
+  background-color: #2d3748;
+  color: #e2e8f0;
+  border: 1px solid #4a5568;
+}
+
+html.dark .gantt-popup-dates {
+  color: #a0aec0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .gantt-container {
+    overflow-x: scroll;
+  }
+}

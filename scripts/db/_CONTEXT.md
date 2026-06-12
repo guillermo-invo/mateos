@@ -21,16 +21,17 @@ Scripts SQL y shell para gestión de base de datos: migraciones manuales, querie
 ```
 scripts/db/
 ├── migrations/
-│   └── recurrentes/              [Sistema tareas recurrentes - Dic 2024]
-│       ├── 01_alta_prioridad_tareas_recurrentes.sql
-│       ├── 02_alta_prioridad_vistas.sql
-│       ├── 03_media_prioridad_modificaciones.sql
-│       ├── 04_baja_prioridad_configuracion.sql
-│       ├── ejecutar_todas_migraciones.sh
-│       ├── README.md
-│       ├── EJEMPLOS_USO.md
-│       ├── QUICK_REFERENCE.md
-│       └── RESUMEN_IMPLEMENTACION.md
+│   ├── recurrentes/              [Sistema tareas recurrentes - Dic 2024]
+│   │   ├── 01_alta_prioridad_tareas_recurrentes.sql
+│   │   ├── 02_alta_prioridad_vistas.sql
+│   │   ├── 03_media_prioridad_modificaciones.sql
+│   │   ├── 04_baja_prioridad_configuracion.sql
+│   │   ├── ejecutar_todas_migraciones.sh
+│   │   ├── README.md
+│   │   ├── EJEMPLOS_USO.md
+│   │   ├── QUICK_REFERENCE.md
+│   │   └── RESUMEN_IMPLEMENTACION.md
+│   └── 20260130_personas_organizaciones_subproyectos.sql  [Sistema personas/orgs - Ene 2026]
 ├── queries_utiles.sql            [Queries, vistas, funciones - 15KB]
 ├── seed-data.sql                 [Datos iniciales - 18KB]
 └── manual-migration.sql          [Migraciones manuales - 6KB]
@@ -157,6 +158,50 @@ cd /home/azureuser/mateos/scripts/db/migrations/recurrentes
 ```
 
 **Documentación completa:** Ver `README.md` en esa carpeta (15KB de docs).
+
+---
+
+### migrations/20260130_personas_organizaciones_subproyectos.sql
+
+**Propósito:** Sistema de gestión de personas, organizaciones y sub-proyectos (implementado Ene 2026).
+
+**Tablas creadas (11 tablas):**
+
+1. **`personas`**: Contactos personales y profesionales
+   - Datos de contacto, redes sociales, tipo de relación
+   - Gestión de contactos estrella, importancia, frecuencia de contacto
+   - **Importado:** 2089 contactos desde Google Contacts
+
+2. **`organizaciones`**: Organizaciones con las que se relaciona el usuario
+   - Datos institucionales, tipo de organización, naturaleza de relación
+   - Gestión de organizaciones estrella
+
+3. **`personas_organizaciones`**: Relación N:M persona-organización
+   - Cargos, tipo de vinculación, nivel de decisión
+
+4. **`sub_proyectos`**: Proyectos emergentes (alianzas, colaboraciones)
+   - Diferente de proyectos_estrategicos: surgen orgánicamente
+   - Vinculación opcional a área_vida y proyecto_estrategico
+   - Presupuesto y horas (estimadas, aprobadas, ejecutadas)
+
+5. **`sub_proyectos_organizaciones`**: Organizaciones socias de cada sub-proyecto
+
+6. **`contactos`**: Registro de interacciones (reuniones, llamadas, emails)
+   - Tipo y canal de contacto, seguimiento
+   - Acuerdos, tareas y compromisos generados (texto libre)
+
+7. **Tablas intermedias** (relaciones N:M):
+   - `contactos_personas`
+   - `contactos_organizaciones`
+   - `contactos_sub_proyectos`
+   - `contactos_proyectos_estrategicos`
+
+8. **`personas_proyectos`**: Participación de personas en proyectos
+
+**Ejecutar:**
+```bash
+docker exec -i transcripcion-postgres psql -U asistente -d asistente_db < scripts/db/migrations/20260130_personas_organizaciones_subproyectos.sql
+```
 
 ---
 
@@ -405,5 +450,5 @@ dropdb mateos_test
 
 ---
 
-**Última actualización:** 2025-12-26
-**Versión:** 1.0
+**Última actualización:** 2026-01-30
+**Versión:** 1.1

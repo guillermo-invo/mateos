@@ -16,6 +16,20 @@ Esta bitácora registra cambios arquitectónicos globales, actualizaciones de in
 
 ## 2026
 
+### Mayo
+
+## 2026-05-21 15:30 | [docker] [seguridad] | [claude-code]
+
+**Respuesta a incidente de seguridad crítico - Restricción de puertos de bases de datos**
+- **[Contexto]:** Parte de la respuesta al incidente de seguridad del servidor (cryptominer detectado)
+- **[Problema]:** PostgreSQL de transcripciones expuesto a `0.0.0.0:1432`
+- **[Corrección]:** Modificado `docker-compose.yml`
+  - Cambio: `"1432:5432"` → `"127.0.0.1:1432:5432"`
+  - Contenedor `transcripcion-postgres` restringido a localhost
+- **[Verificación]:** Puerto ahora solo accesible desde el servidor local
+- **[Impacto]:** Cero - aplicaciones locales (next-app, automatizaciones) siguen funcionando
+- **[Lección]:** Bases de datos no necesitan exposición externa para comunicación entre contenedores
+
 ### Enero
 
 ## 2026-01-03 10:00 | [database] [google-calendar] | [claude-code]
